@@ -36,9 +36,6 @@ $ git clone https://github.com/vpasumarthi/postdoc_scripts.git
 # Navigate to root directory
 $ cd postdoc_scripts
 
-# Install requirements
-$ pip install -r requirements.txt
-
 # Perform a local installation of package with Pip 
 $ pip install -e .
 ```

@@ -84,13 +84,13 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
         diff_H = ts_energies_H - ts_ref_data
 
         if num_bars % 2:
-            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_noH, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, No H in $T_{{Ads}}$')
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_noH, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, No H in $TS_{{Ads}}$')
             index += 1
-            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_H, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, H in $T_{{Ads}}$')
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_H, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, H in $TS_{{Ads}}$')
         else:
-            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_noH, width=bar_width, align='edge', label=f'wf_corr={phi_correction:.1f}, No H in $T_{{Ads}}$')
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_noH, width=bar_width, align='edge', label=f'wf_corr={phi_correction:.1f}, No H in $TS_{{Ads}}$')
             index += 1
-            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_H, width=bar_width, align='edge', label=f'wf_corr={phi_correction:.1f}, H in $T_{{Ads}}$')
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_H, width=bar_width, align='edge', label=f'wf_corr={phi_correction:.1f}, H in $TS_{{Ads}}$')
         index += 1
 
     ax.legend()

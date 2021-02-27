@@ -102,5 +102,6 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
     yticks = plt.yticks()[0]
     plt.tight_layout()
     figure_name = f'Validation of TS Calculations.png'
-    plt.savefig(figure_name, dpi=600)
+    figure_path = input_data_filepath.parent / figure_name
+    plt.savefig(figure_path, dpi=600)
     return None

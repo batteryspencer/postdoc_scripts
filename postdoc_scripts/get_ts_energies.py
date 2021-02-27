@@ -32,9 +32,9 @@ def compute_ts_energies(ts_data, fs_data, e_f_data, phi_correction, alk_corr,
     ts_energies = E_r_alk + e_f_data
     return ts_energies
 
-def plot_ts_energies(ts_states, phi_correction_list, alk_corr_list,
-                     ts_data_filepath, fs_data_filepath, e_f_data_filepath,
-                     ts_ref_data_filepath, v_extra, rxn_type, subtitle, suffix):
+def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr_list,
+                 v_extra, ts_data_filepath, fs_data_filepath, e_f_data_filepath,
+                 ts_ref_data_filepath, subtitle, suffix):
 
     ts_data = np.loadtxt(ts_data_filepath)
     fs_data = np.loadtxt(fs_data_filepath)

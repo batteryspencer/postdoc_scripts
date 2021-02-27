@@ -5,39 +5,56 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 
 
-def compute_ts_energies(ts_data, fs_data, e_f_data, phi_correction, alk_corr,
+def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
                         v_extra, rxn_type):
-    E_TS = ts_data[:, 0]
-    q_TS = ts_data[:, 1]
-    phi_TS = ts_data[:, 2]
-    phi_TS_corr = phi_TS - phi_correction
+    E_TS_noH = input_data[:, 0]
+    q_TS_noH = input_data[:, 1]
+    phi_TS_noH = input_data[:, 2]
+    phi_TS_noH_corr = phi_TS_noH - phi_correction
+
+    E_FS_noH = input_data[:, 3]
+    q_FS_noH = input_data[:, 4]
+    phi_FS_noH = input_data[:, 5]
+    phi_FS_noH_corr = phi_TS_noH - phi_correction
+
+    E_TS_H = input_data[:, 6]
+    q_TS_H = input_data[:, 7]
+    phi_TS_H = input_data[:, 8]
+    phi_TS_H_corr = phi_TS_noH - phi_correction
+
+    E_FS_H = input_data[:, 9]
+    q_FS_H = input_data[:, 10]
+    phi_FS_H = input_data[:, 11]
+    phi_FS_H_corr = phi_TS_noH - phi_correction
+
+    del_E_noH = E_TS_noH - E_FS_noH
+    del_q_noH = q_TS_noH - q_FS_noH
+    del_phi_noH = phi_TS_noH_corr - phi_FS_noH_corr
     
-    E_FS = fs_data[:, 0]
-    q_FS = fs_data[:, 1]
-    phi_FS = fs_data[:, 2]
-    phi_FS_corr = phi_FS - phi_correction
-    
-    del_E = E_TS - E_FS
-    del_q = q_TS - q_FS
-    del_phi = phi_TS_corr - phi_FS_corr
-    
+    del_E_H = E_TS_H - E_FS_H
+    del_q_H = q_TS_H - q_FS_H
+    del_phi_H = phi_TS_H_corr - phi_FS_H_corr
+
     # backward barrier
-    E_r = del_E + 0.5 * del_q * del_phi
+    E_r_noH = del_E_noH + 0.5 * del_q_noH * del_phi_noH
+    E_r_H = del_E_H + 0.5 * del_q_H * del_phi_H
     
     # charge extrapolation. Extrapolate to 4.0 eV (U_RHE = 0 V at pH7).
-    E_r_extrapolated = E_r + del_q * (phi_FS_corr - v_extra)
+    E_r_extrapolated_noH = E_r_noH + del_q_noH * (phi_FS_noH_corr - v_extra)
+    E_r_extrapolated_H = E_r_H + del_q_H * (phi_FS_H_corr - v_extra)
     
-    E_r_alk = E_r_extrapolated + alk_corr * np.asarray([1.0 if element=='Electrochemical' else 0.0 for element in rxn_type])
+    E_r_alk_noH = E_r_extrapolated_noH + alk_corr * np.asarray([1.0 if element=='Electrochemical' else 0.0 for element in rxn_type])
+    E_r_alk_H = E_r_extrapolated_H + alk_corr * np.asarray([1.0 if element=='Electrochemical' else 0.0 for element in rxn_type])
     
-    ts_energies = E_r_alk + e_f_data
-    return ts_energies
+    ts_energies_noH = E_r_alk_noH + e_f_data
+    ts_energies_H = E_r_alk_H + e_f_data
+    return (ts_energies_noH, ts_energies_H)
 
 def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
-                     v_extra, ts_data_filepath, fs_data_filepath,
-                     e_f_data_filepath, ts_ref_data_filepath, subtitle, suffix):
+                     v_extra, input_data_filepath, e_f_data_filepath,
+                     ts_ref_data_filepath):
 
-    ts_data = np.loadtxt(ts_data_filepath)
-    fs_data = np.loadtxt(fs_data_filepath)
+    input_data = np.loadtxt(input_data_filepath)
     e_f_data = np.loadtxt(e_f_data_filepath)
     ts_ref_data = np.loadtxt(ts_ref_data_filepath)
 
@@ -50,28 +67,30 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
     ts_state_range = np.arange(len(ts_states))
 
     num_bars = len(phi_correction_list)
-    bar_width = (ts_state_range[1] - ts_state_range[0]) / num_bars / 2
+    bar_width = (ts_state_range[1] - ts_state_range[0]) / num_bars / 4
     
     bar_index = 0
     for phi_correction in phi_correction_list:
         bar_index += 1
-        ts_energies = compute_ts_energies(ts_data, fs_data, e_f_data,
-                                          phi_correction, alk_corr, v_extra,
-                                          rxn_type)
+        (ts_energies_noH, ts_energies_H) = compute_ts_energies(
+            input_data, e_f_data, phi_correction, alk_corr, v_extra, rxn_type)
         
         # deviation
-        diff = ts_energies - ts_ref_data
+        diff_noH = ts_energies_noH - ts_ref_data
+        diff_H = ts_energies_H - ts_ref_data
 
-        ax.bar(ts_state_range + bar_index * bar_width, diff, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}')
+        ax.bar(ts_state_range + bar_index * bar_width, diff_noH, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, No H in $T_{{Ads}}$')
+        bar_index += 1
+        ax.bar(ts_state_range + bar_index * bar_width, diff_H, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, H in $T_{{Ads}}$')
 
     ax.legend()
     ax.set_xlabel('Transition State', fontsize=font_size)
     ax.set_ylabel('Energy (eV)', fontsize=font_size)
-    ax.set_title(f'Validation Errors for TS at epsilon=0.0\n{subtitle}')
+    ax.set_title(f'Validation Errors for TS at epsilon=0.0')
     ax.set_xticks(ts_state_range)
     ax.set_xticklabels(ts_states, rotation=90, fontsize=tick_size)
     yticks = plt.yticks()[0]
     plt.tight_layout()
-    figure_name = f'Validation of TS Calculations_{suffix}.png'
+    figure_name = f'Validation of TS Calculations.png'
     plt.savefig(figure_name, dpi=600)
     return None

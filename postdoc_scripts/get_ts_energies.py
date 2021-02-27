@@ -66,12 +66,16 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
     ax = fig.add_subplot(111)
     ts_state_range = np.arange(len(ts_states))
 
-    num_bars = len(phi_correction_list)
-    bar_width = (ts_state_range[1] - ts_state_range[0]) / num_bars / 4
-    
-    bar_index = 0
+    num_bars = len(phi_correction_list) * 2
+    bar_width = (ts_state_range[1] - ts_state_range[0]) / num_bars / 2
+
+    if num_bars % 2:
+        bar_indices = np.arange(-(num_bars // 2), (num_bars // 2) + 1)
+    else:
+        bar_indices = np.arange(-(num_bars // 2), num_bars // 2)
+
+    index = 0
     for phi_correction in phi_correction_list:
-        bar_index += 1
         (ts_energies_noH, ts_energies_H) = compute_ts_energies(
             input_data, e_f_data, phi_correction, alk_corr, v_extra, rxn_type)
         
@@ -79,9 +83,15 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
         diff_noH = ts_energies_noH - ts_ref_data
         diff_H = ts_energies_H - ts_ref_data
 
-        ax.bar(ts_state_range + bar_index * bar_width, diff_noH, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, No H in $T_{{Ads}}$')
-        bar_index += 1
-        ax.bar(ts_state_range + bar_index * bar_width, diff_H, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, H in $T_{{Ads}}$')
+        if num_bars % 2:
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_noH, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, No H in $T_{{Ads}}$')
+            index += 1
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_H, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, H in $T_{{Ads}}$')
+        else:
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_noH, width=bar_width, align='edge', label=f'wf_corr={phi_correction:.1f}, No H in $T_{{Ads}}$')
+            index += 1
+            ax.bar(ts_state_range + bar_indices[index] * bar_width, diff_H, width=bar_width, align='edge', label=f'wf_corr={phi_correction:.1f}, H in $T_{{Ads}}$')
+        index += 1
 
     ax.legend()
     ax.set_xlabel('Transition State', fontsize=font_size)

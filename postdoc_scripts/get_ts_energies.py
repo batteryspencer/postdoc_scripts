@@ -95,7 +95,7 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
 
     ax.legend()
     ax.set_xlabel('Transition State', fontsize=font_size)
-    ax.set_ylabel('Energy (eV)', fontsize=font_size)
+    ax.set_ylabel('Energy Difference (eV)\n($E_{{MyCalc}}$ - $E_{{Hongjie}}$)', fontsize=font_size)
     ax.set_title(f'Validation Errors for TS at epsilon=0.0')
     ax.set_xticks(ts_state_range)
     ax.set_xticklabels(ts_states, rotation=90, fontsize=tick_size)

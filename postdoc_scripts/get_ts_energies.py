@@ -32,9 +32,9 @@ def compute_ts_energies(ts_data, fs_data, e_f_data, phi_correction, alk_corr,
     ts_energies = E_r_alk + e_f_data
     return ts_energies
 
-def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr_list,
-                 v_extra, ts_data_filepath, fs_data_filepath, e_f_data_filepath,
-                 ts_ref_data_filepath, subtitle, suffix):
+def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
+                     v_extra, ts_data_filepath, fs_data_filepath,
+                     e_f_data_filepath, ts_ref_data_filepath, subtitle, suffix):
 
     ts_data = np.loadtxt(ts_data_filepath)
     fs_data = np.loadtxt(fs_data_filepath)
@@ -49,22 +49,20 @@ def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr_list,
     ax = fig.add_subplot(111)
     ts_state_range = np.arange(len(ts_states))
 
-    num_bars = len(phi_correction_list) * len(alk_corr_list)
+    num_bars = len(phi_correction_list)
     bar_width = (ts_state_range[1] - ts_state_range[0]) / num_bars / 2
     
     bar_index = 0
     for phi_correction in phi_correction_list:
-        for alk_corr in alk_corr_list:
-            bar_index += 1
-            ts_energies = compute_ts_energies(ts_data, fs_data, e_f_data,
-                                              phi_correction, alk_corr, v_extra,
-                                              rxn_type)
-            
-            # deviation
-            diff = ts_energies - ts_ref_data
+        bar_index += 1
+        ts_energies = compute_ts_energies(ts_data, fs_data, e_f_data,
+                                          phi_correction, alk_corr, v_extra,
+                                          rxn_type)
+        
+        # deviation
+        diff = ts_energies - ts_ref_data
 
-            # ax.bar(ts_state_range, diff, color='#0066cc')
-            ax.bar(ts_state_range + bar_index * bar_width, diff, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}, alk_corr={alk_corr:.2f}')
+        ax.bar(ts_state_range + bar_index * bar_width, diff, width=bar_width, align='center', label=f'wf_corr={phi_correction:.1f}')
 
     ax.legend()
     ax.set_xlabel('Transition State', fontsize=font_size)

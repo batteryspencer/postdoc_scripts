@@ -1,10 +1,10 @@
-# Postdoc Scripts
+Postdoc Scripts
 =================
-Open-source repository for utility and job submission scripts.
-
 [//]: # (Badges)
 [![License](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue)](https://github.com/vpasumarthi/postdoc_scripts)
+
+Open-source repository for utility and job submission scripts.
 
 ## Package Installation
 

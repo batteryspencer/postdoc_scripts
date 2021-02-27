@@ -20,7 +20,7 @@ except:
 
 setup(
     # Self-descriptive entries which should always be present
-    name='Postdoc Scripts',
+    name='postdoc_scripts',
     author='Viswanath Pasumarthi',
     author_email='pasumart@stanford.edu',
     url="https://github.com/vpasumarthi/postdoc_scripts",

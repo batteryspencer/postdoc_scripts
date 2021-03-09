@@ -50,7 +50,7 @@ def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
     ts_energies_H = E_r_alk_H + e_f_data
     return (ts_energies_noH, ts_energies_H)
 
-def plot_ts_energies(ts_states, rxn_type, phi_correction_list, alk_corr,
+def plot_ts_energies(ts_states_ticknames, rxn_type, phi_correction_list, alk_corr,
                      v_extra, input_data_filepath, e_f_data_filepath,
                      ts_ref_data_filepath):
 

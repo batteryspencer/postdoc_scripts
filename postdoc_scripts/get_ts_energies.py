@@ -39,7 +39,6 @@ def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
     E_r_noH = del_E_noH + 0.5 * del_q_noH * del_phi_noH
     E_r_H = del_E_H + 0.5 * del_q_H * del_phi_H
     
-    # charge extrapolation. Extrapolate to 4.0 eV (U_RHE = 0 V at pH7).
     E_r_extrapolated_noH = E_r_noH + del_q_noH * (phi_FS_noH_corr - v_extra)
     E_r_extrapolated_H = E_r_H + del_q_H * (phi_FS_H_corr - v_extra)
     
@@ -50,11 +49,64 @@ def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
     ts_energies_H = E_r_alk_H + e_f_data
     return (ts_energies_noH, ts_energies_H)
 
-def plot_ts_energies(ts_states_ticknames, rxn_type, phi_correction_list, alk_corr,
-                     v_extra, input_data_filepath, e_f_data_filepath,
-                     ts_ref_data_filepath):
+def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
+                     phi_correction_list, alk_corr, v_extra,
+                     e_f_data_filepath, ts_ref_data_filepath):
 
-    input_data = np.loadtxt(input_data_filepath)
+    ts_data_file_path = e_f_data_filepath.parent / 'ts_data'
+    wf_dipole_index = 0
+    src_filenames = ['out.log']
+    num_ts_states = len(ts_states_dirnames)
+    input_data = np.zeros((num_ts_states, 12))
+    ts_energies = np.zeros((num_ts_states, 1))
+    fs_energies = np.zeros((num_ts_states, 1))
+    ts_wf = np.zeros((num_ts_states, 1))
+    fs_wf = np.zeros((num_ts_states, 1))
+    ts_charges_noH = np.zeros((num_ts_states, 1))
+    fs_charges_noH = np.zeros((num_ts_states, 1))
+    ts_charges_H = np.zeros((num_ts_states, 1))
+    fs_charges_H = np.zeros((num_ts_states, 1))
+    for ts_state_index, ts_states_dirname in enumerate(ts_states_dirnames):
+        ts_state_dirpath = ts_data_file_path / ts_states_dirname
+
+        ts_dir_path = ts_state_dirpath / 'TS'
+        ts_log_file_path = ts_dir_path / 'out.log'
+        wf_line_index = -1
+        energy_line_index = -1
+        with open(ts_log_file_path) as ts_log_file:
+            for line_index, line in enumerate(ts_log_file.readlines()):
+                if 'wf' in line:
+                    wf_line_index = line_index + 1
+                    energy_line_index = line_index + 3
+                if line_index == wf_line_index:
+                    if wf_dipole_index == 0:
+                        ts_wf[ts_state_index] = float(line.split('[')[1].split(',')[0])
+                    elif wf_dipole_index == 1:
+                        ts_wf[ts_state_index] = float(line.split(']')[0].split(' ')[1])
+                if line_index == energy_line_index:
+                    ts_energies[ts_state_index] = line.split()[0]
+
+        fs_dir_path = ts_state_dirpath / 'FS'
+        fs_log_file_path = fs_dir_path / 'out.log'
+        wf_line_index = -1
+        energy_line_index = -1
+        with open(fs_log_file_path) as fs_log_file:
+            for line_index, line in enumerate(fs_log_file.readlines()):
+                if 'wf' in line:
+                    wf_line_index = line_index + 1
+                    energy_line_index = line_index + 3
+                if line_index == wf_line_index:
+                    if wf_dipole_index == 0:
+                        fs_wf[ts_state_index] = float(line.split('[')[1].split(',')[0])
+                    elif wf_dipole_index == 1:
+                        fs_wf[ts_state_index] = float(line.split(']')[0].split(' ')[1])
+                if line_index == energy_line_index:
+                    fs_energies[ts_state_index] = line.split()[0]
+        
+    input_data = np.concatenate((ts_energies, ts_charges_noH, ts_wf,
+                                 fs_energies, fs_charges_noH, fs_wf,
+                                 ts_energies, ts_charges_H, ts_wf,
+                                 fs_energies, fs_charges_H, fs_wf,), axis=1)
     e_f_data = np.loadtxt(e_f_data_filepath)
     ts_ref_data = np.loadtxt(ts_ref_data_filepath)
 
@@ -64,7 +116,7 @@ def plot_ts_energies(ts_states_ticknames, rxn_type, phi_correction_list, alk_cor
     
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ts_state_range = np.arange(len(ts_states))
+    ts_state_range = np.arange(num_ts_states)
 
     num_bars = len(phi_correction_list) * 2
     bar_width = (ts_state_range[1] - ts_state_range[0]) / num_bars / 2
@@ -98,7 +150,7 @@ def plot_ts_energies(ts_states_ticknames, rxn_type, phi_correction_list, alk_cor
     ax.set_ylabel('Energy Difference (eV)\n($E_{{MyCalc}}$ - $E_{{Hongjie}}$)', fontsize=font_size)
     ax.set_title(f'Validation Errors for TS at epsilon=0.0')
     ax.set_xticks(ts_state_range)
-    ax.set_xticklabels(ts_states, rotation=90, fontsize=tick_size)
+    ax.set_xticklabels(ts_states_ticknames, rotation=90, fontsize=tick_size)
     yticks = plt.yticks()[0]
     plt.tight_layout()
     figure_name = f'Validation of TS Calculations.png'

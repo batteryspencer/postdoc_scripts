@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 
+from postdoc_scripts.get_solvation_layer_charge import get_solvation_layer_charge
+
 
 def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
                         v_extra, rxn_type):
@@ -50,12 +52,11 @@ def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
     return (ts_energies_noH, ts_energies_H)
 
 def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
-                     phi_correction_list, alk_corr, v_extra,
-                     e_f_data_filepath, ts_ref_data_filepath):
+                     phi_correction_list, alk_corr, v_extra, e_f_data_filepath,
+                     ts_ref_data_filepath, adsorbate_list, bond_distance_cutoff):
 
     ts_data_file_path = e_f_data_filepath.parent / 'ts_data'
-    wf_dipole_index = 0
-    src_filenames = ['out.log']
+    wf_dipole_index = 0  # side of the slab where solvation layer exists. 0=top, 1=bottom.
     num_ts_states = len(ts_states_dirnames)
     input_data = np.zeros((num_ts_states, 12))
     ts_energies = np.zeros((num_ts_states, 1))
@@ -66,11 +67,16 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
     fs_charges_noH = np.zeros((num_ts_states, 1))
     ts_charges_H = np.zeros((num_ts_states, 1))
     fs_charges_H = np.zeros((num_ts_states, 1))
+    ts_configuration = 'TS'
+    fs_configuration = 'FS'
+    logfile = 'out.log'
+
     for ts_state_index, ts_states_dirname in enumerate(ts_states_dirnames):
         ts_state_dirpath = ts_data_file_path / ts_states_dirname
+        adsorbate_ts_noH, adsorbate_fs_noH, adsorbate_ts_H, adsorbate_fs_H = adsorbate_list[ts_state_index]
 
-        ts_dir_path = ts_state_dirpath / 'TS'
-        ts_log_file_path = ts_dir_path / 'out.log'
+        ts_dir_path = ts_state_dirpath / ts_configuration
+        ts_log_file_path = ts_dir_path / logfile
         wf_line_index = -1
         energy_line_index = -1
         with open(ts_log_file_path) as ts_log_file:
@@ -86,8 +92,11 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                 if line_index == energy_line_index:
                     ts_energies[ts_state_index] = line.split()[0]
 
-        fs_dir_path = ts_state_dirpath / 'FS'
-        fs_log_file_path = fs_dir_path / 'out.log'
+        ts_charges_noH[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_noH, bond_distance_cutoff)
+        ts_charges_H[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_H, bond_distance_cutoff)
+
+        fs_dir_path = ts_state_dirpath / fs_configuration
+        fs_log_file_path = fs_dir_path / logfile
         wf_line_index = -1
         energy_line_index = -1
         with open(fs_log_file_path) as fs_log_file:
@@ -102,7 +111,10 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                         fs_wf[ts_state_index] = float(line.split(']')[0].split(' ')[1])
                 if line_index == energy_line_index:
                     fs_energies[ts_state_index] = line.split()[0]
-        
+
+        fs_charges_noH[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_noH, bond_distance_cutoff)
+        fs_charges_H[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_H, bond_distance_cutoff)
+
     input_data = np.concatenate((ts_energies, ts_charges_noH, ts_wf,
                                  fs_energies, fs_charges_noH, fs_wf,
                                  ts_energies, ts_charges_H, ts_wf,

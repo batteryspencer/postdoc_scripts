@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 
 from cathub.catmap_interface import formula_to_chemical_symbols
@@ -9,13 +7,13 @@ bohr = 0.52917721092  # angstrom
 bader_charges_filename = 'bader_charges.txt'
 coordinates_filename = 'ACF.dat'
 
-def get_solvation_layer_charge(configuration, adsorbate, bond_distance_cutoff):
+def get_solvation_layer_charge(src_path, adsorbate, bond_distance_cutoff):
     chemical_symbols_dict = formula_to_chemical_symbols(adsorbate)
 
     element_list = []
     bader_charge_list = []
-    bader_charges_filepath = Path.cwd() / configuration / bader_charges_filename
-    coordinates_filepath = Path.cwd() / configuration / coordinates_filename
+    bader_charges_filepath = src_path / bader_charges_filename
+    coordinates_filepath = src_path / coordinates_filename
     with open(bader_charges_filepath, 'r') as bader_charges_file:
         for line_index, line in enumerate(bader_charges_file):
             line_elements = line.split()

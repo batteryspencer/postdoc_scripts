@@ -66,14 +66,17 @@ def get_solvation_layer_charge(configuration, adsorbate, bond_distance_cutoff):
         for reference_atom_index in reference_atom_indices:
             distance_to_ref = np.linalg.norm(coordinates[non_substrate_indices] - coordinates[reference_atom_index], axis=1)
             bonding_subindices_to_ref = np.where((distance_to_ref > 0) & (distance_to_ref < bond_distance_cutoff))[0]
-            bonding_atom_indices_to_ref = [non_substrate_indices[index] for index in bonding_subindices_to_ref if non_substrate_indices[index] not in adsorbate_indices]
+            distance_to_subindices = distance_to_ref[bonding_subindices_to_ref]
+            sorted_bonding_subindices_to_ref = bonding_subindices_to_ref[np.argsort(distance_to_subindices)]
+            bonding_atom_indices_to_ref = [non_substrate_indices[index] for index in sorted_bonding_subindices_to_ref if non_substrate_indices[index] not in adsorbate_indices]
             reference_atom_indices = bonding_atom_indices_to_ref[:]
             for atom_index in bonding_atom_indices_to_ref:
                 chemical_symbol = element_list[atom_index]
-                if adsorbate_scrape[chemical_symbol]:
-                    adsorbate_indices.append(atom_index)
-                    adsorbate_scrape[chemical_symbol] -= 1
-                    num_atoms_to_scrape -= 1
+                if chemical_symbol in adsorbate_scrape:
+                    if adsorbate_scrape[chemical_symbol]:
+                        adsorbate_indices.append(atom_index)
+                        adsorbate_scrape[chemical_symbol] -= 1
+                        num_atoms_to_scrape -= 1
     
     solvation_layer_indices = [index for index in non_substrate_indices if index not in adsorbate_indices]
     solvation_layer_charges = bader_charge_array[solvation_layer_indices]

@@ -5,7 +5,11 @@ import numpy as np
 from cathub.catmap_interface import formula_to_chemical_symbols
 
 
-def get_solvation_layer_charge(configuration, adsorbate):
+bohr = 0.52917721092  # angstrom
+bader_charges_filename = 'bader_charges.txt'
+coordinates_filename = 'ACF.dat'
+
+def get_solvation_layer_charge(configuration, adsorbate, bond_distance_cutoff):
     chemical_symbols_dict = formula_to_chemical_symbols(adsorbate)
 
     element_list = []

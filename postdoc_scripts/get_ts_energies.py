@@ -92,8 +92,12 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                 if line_index == energy_line_index:
                     ts_energies[ts_state_index] = line.split()[0]
 
-        ts_charges_noH[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_noH, bond_distance_cutoff)
-        ts_charges_H[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_H, bond_distance_cutoff)
+        if rxn_type[ts_state_index] == "Chemical":
+            ts_charges_noH[ts_state_index] = 0.0
+            ts_charges_H[ts_state_index] = 0.0
+        else:
+            ts_charges_noH[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_noH, bond_distance_cutoff)
+            ts_charges_H[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_H, bond_distance_cutoff)
 
         fs_dir_path = ts_state_dirpath / fs_configuration
         fs_log_file_path = fs_dir_path / logfile
@@ -112,8 +116,12 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                 if line_index == energy_line_index:
                     fs_energies[ts_state_index] = line.split()[0]
 
-        fs_charges_noH[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_noH, bond_distance_cutoff)
-        fs_charges_H[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_H, bond_distance_cutoff)
+        if rxn_type[ts_state_index] == "Chemical":
+            fs_charges_noH[ts_state_index] = 0.0
+            fs_charges_H[ts_state_index] = 0.0
+        else:
+            fs_charges_noH[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_noH, bond_distance_cutoff)
+            fs_charges_H[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_H, bond_distance_cutoff)
 
     input_data = np.concatenate((ts_energies, ts_charges_noH, ts_wf,
                                  fs_energies, fs_charges_noH, fs_wf,

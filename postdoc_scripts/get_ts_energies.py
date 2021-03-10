@@ -55,7 +55,8 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                      phi_correction_list, alk_corr, v_extra, e_f_data_filepath,
                      ts_ref_data_filepath, adsorbate_list, bond_distance_cutoff):
 
-    ts_data_file_path = e_f_data_filepath.parent / 'ts_data'
+    src_path = dst_path = e_f_data_filepath.parent
+    ts_data_file_path = src_path / 'ts_data'
     wf_dipole_index = 0  # side of the slab where solvation layer exists. 0=top, 1=bottom.
     num_ts_states = len(ts_states_dirnames)
     input_data = np.zeros((num_ts_states, 12))
@@ -96,8 +97,8 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
             ts_charges_noH[ts_state_index] = 0.0
             ts_charges_H[ts_state_index] = 0.0
         else:
-            ts_charges_noH[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_noH, bond_distance_cutoff)
-            ts_charges_H[ts_state_index] = get_solvation_layer_charge(ts_configuration, adsorbate_ts_H, bond_distance_cutoff)
+            ts_charges_noH[ts_state_index] = get_solvation_layer_charge(ts_dir_path, adsorbate_ts_noH, bond_distance_cutoff)
+            ts_charges_H[ts_state_index] = get_solvation_layer_charge(ts_dir_path, adsorbate_ts_H, bond_distance_cutoff)
 
         fs_dir_path = ts_state_dirpath / fs_configuration
         fs_log_file_path = fs_dir_path / logfile
@@ -120,8 +121,8 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
             fs_charges_noH[ts_state_index] = 0.0
             fs_charges_H[ts_state_index] = 0.0
         else:
-            fs_charges_noH[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_noH, bond_distance_cutoff)
-            fs_charges_H[ts_state_index] = get_solvation_layer_charge(fs_configuration, adsorbate_fs_H, bond_distance_cutoff)
+            fs_charges_noH[ts_state_index] = get_solvation_layer_charge(fs_dir_path, adsorbate_fs_noH, bond_distance_cutoff)
+            fs_charges_H[ts_state_index] = get_solvation_layer_charge(fs_dir_path, adsorbate_fs_H, bond_distance_cutoff)
 
     input_data = np.concatenate((ts_energies, ts_charges_noH, ts_wf,
                                  fs_energies, fs_charges_noH, fs_wf,
@@ -174,6 +175,6 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
     yticks = plt.yticks()[0]
     plt.tight_layout()
     figure_name = f'Validation of TS Calculations.png'
-    figure_path = input_data_filepath.parent / figure_name
+    figure_path = dst_path / figure_name
     plt.savefig(figure_path, dpi=600)
     return None

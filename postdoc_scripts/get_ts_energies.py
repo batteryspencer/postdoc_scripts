@@ -52,8 +52,9 @@ def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
     return (ts_energies_noH, ts_energies_H)
 
 def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
-                     phi_correction_list, alk_corr, v_extra, e_f_data_filepath,
-                     ts_ref_data_filepath, adsorbate_list, bond_distance_cutoff):
+                     phi_correction_list, alk_corr, v_extra, energy_offset,
+                     e_f_data_filepath, ts_ref_data_filepath, adsorbate_list,
+                     bond_distance_cutoff):
 
     src_path = dst_path = e_f_data_filepath.parent
     ts_data_file_path = src_path / 'ts_data'
@@ -91,7 +92,7 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                     elif wf_dipole_index == 1:
                         ts_wf[ts_state_index] = float(line.split(']')[0].split(' ')[1])
                 if line_index == energy_line_index:
-                    ts_energies[ts_state_index] = line.split()[0]
+                    ts_energies[ts_state_index] = float(line.split()[0]) + energy_offset[0][ts_state_index]
 
         if rxn_type[ts_state_index] == "Chemical":
             ts_charges_noH[ts_state_index] = 0.0
@@ -115,7 +116,7 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                     elif wf_dipole_index == 1:
                         fs_wf[ts_state_index] = float(line.split(']')[0].split(' ')[1])
                 if line_index == energy_line_index:
-                    fs_energies[ts_state_index] = line.split()[0]
+                    fs_energies[ts_state_index] = float(line.split()[0]) + energy_offset[1][ts_state_index]
 
         if rxn_type[ts_state_index] == "Chemical":
             fs_charges_noH[ts_state_index] = 0.0

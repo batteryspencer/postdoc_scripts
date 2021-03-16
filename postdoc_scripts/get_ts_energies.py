@@ -8,7 +8,7 @@ from postdoc_scripts.get_solvation_layer_charge import get_solvation_layer_charg
 
 
 def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
-                        v_extra, rxn_type):
+                        v_extra, rxn_type, beta, pH_out):
     E_TS_noH = input_data[:, 0]
     q_TS_noH = input_data[:, 1]
     phi_TS_noH = input_data[:, 2]
@@ -49,12 +49,16 @@ def compute_ts_energies(input_data, e_f_data, phi_correction, alk_corr,
     
     ts_energies_noH = E_r_alk_noH + e_f_data
     ts_energies_H = E_r_alk_H + e_f_data
+
+    # Apply RHE correction
+    ts_energies_noH += beta * 0.059 * (14 - pH_out)
+    ts_energies_H += beta * 0.059 * (14 - pH_out)
     return (ts_energies_noH, ts_energies_H)
 
 def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                      phi_correction_list, alk_corr, v_extra, energy_offset,
-                     e_f_data_filepath, ts_ref_data_filepath, adsorbate_list,
-                     bond_distance_cutoff):
+                     beta, pH_out, e_f_data_filepath, ts_ref_data_filepath,
+                     adsorbate_list, bond_distance_cutoff):
 
     src_path = dst_path = e_f_data_filepath.parent
     ts_data_file_path = src_path / 'ts_data'
@@ -149,9 +153,11 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
         bar_indices = np.arange(-(num_bars // 2), num_bars // 2)
 
     index = 0
+    beta = np.asarray(beta)
     for phi_correction in phi_correction_list:
         (ts_energies_noH, ts_energies_H) = compute_ts_energies(
-            input_data, e_f_data, phi_correction, alk_corr, v_extra, rxn_type)
+            input_data, e_f_data, phi_correction, alk_corr, v_extra, rxn_type,
+            beta, pH_out)
         
         # deviation
         diff_noH = ts_energies_noH - ts_ref_data

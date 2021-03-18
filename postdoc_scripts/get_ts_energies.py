@@ -61,7 +61,6 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
                      adsorbate_list, bond_distance_cutoff):
 
     src_path = dst_path = e_f_data_filepath.parent
-    ts_data_file_path = src_path / 'ts_data'
     wf_dipole_index = 0  # side of the slab where solvation layer exists. 0=top, 1=bottom.
     num_ts_states = len(ts_states_dirnames)
     input_data = np.zeros((num_ts_states, 12))
@@ -78,7 +77,7 @@ def plot_ts_energies(ts_states_dirnames, ts_states_ticknames, rxn_type,
     logfile = 'out.log'
 
     for ts_state_index, ts_states_dirname in enumerate(ts_states_dirnames):
-        ts_state_dirpath = ts_data_file_path / ts_states_dirname
+        ts_state_dirpath = src_path / ts_states_dirname
         adsorbate_ts_noH, adsorbate_fs_noH, adsorbate_ts_H, adsorbate_fs_H = adsorbate_list[ts_state_index]
 
         ts_dir_path = ts_state_dirpath / ts_configuration

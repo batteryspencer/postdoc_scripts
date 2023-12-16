@@ -49,12 +49,32 @@ function log_job_details {
     echo "Total nodes requested: $NUM_NODE"
     echo "Total CPUs for this jobs: nodes x ppn: $PROC_NUM"
     echo $SLURM_JOB_NODELIST > nodefile.$SLURM_JOB_ID
+    NIONS=$(sed -n '7p' POSCAR | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum}')
 }
 
 # --- Email Notifications ---
-send_mail() {
+function send_mail {
     local action=$1
     $JAPPSBASE/templates/send_job_mail_slurm.py "${action}"
+}
+
+function check_contcar_completeness {
+    local poscar_header_lines=9
+    local separator_line=1
+    local predictor_block_header_lines=3
+    local expected_lines=$((poscar_header_lines + 2 * NIONS + separator_line))
+    
+    if [ "$IS_MD_CALC" -eq 1 ]; then
+        expected_lines=$((expected_lines + separator_line + predictor_block_header_lines + 3 * NIONS))
+    fi
+
+    local actual_lines=$(wc -l < CONTCAR)
+
+    if [ "$actual_lines" -eq "$expected_lines" ]; then
+        return 0  # CONTCAR is complete (success)
+    else
+        return 1  # CONTCAR is incomplete (failure)
+    fi
 }
 
 # --- Calculation Functions ---
@@ -63,10 +83,10 @@ send_mail() {
 #   None
 # Returns:
 #   0 if converged
-#   1 if non-empty CONTCAR is found
-#   2 if empty CONTCAR is found
+#   1 if complete CONTCAR is found
+#   2 if incomplete CONTCAR is found
 #   3 if OUTCAR is missing
-function check_convergence() {
+function check_convergence {
     COMPLETED_TIMESTEPS=0
     local sub=${SUB:-1}
     if [ $sub -gt 1 ]; then
@@ -91,7 +111,7 @@ function check_convergence() {
 
         if [ $COMPLETED_TIMESTEPS -ge $TOTAL_TIMESTEPS ]; then
             return 0
-        elif [ -s "CONTCAR" ]; then
+        elif check_contcar_completeness; then
             return 1
         else
             return 2
@@ -105,22 +125,22 @@ function check_convergence() {
     fi
 }
 
-function resubmit() {
+function restart_from_checkpoint {
     local sub=${SUB:-1}
     sub=$(expr $sub + 1)
-    if [ $sub -le $resubmissions ]; then
-        [ "${mail_resubmit}" == "TRUE" ] && send_mail "RESUB:$(expr $sub - 1)"
+    if [ $sub -le $max_restarts ]; then
+        [ "${mail_restart}" == "TRUE" ] && send_mail "RESUB:$(expr $sub - 1)"
         CANCEL=$(sbatch --dependency="afterany:${SLURM_JOB_ID}" --export=ALL,SUB=$sub,OLD_SLURM_JOB_ID=$SLURM_JOB_ID,TOTAL_TIMESTEPS=$TOTAL_TIMESTEPS $0)
         CANCEL=$(echo $CANCEL | cut -d ' ' -f 4)
     fi
 }
 
-function cancel_resubmit() {
+function cancel_restart {
     [ -n "${CANCEL}" ] && scancel "${CANCEL}"
 }
 
-function completed() {
-    cancel_resubmit
+function completed {
+    cancel_restart
     [ "${mail_converge}" == "TRUE" ] && send_mail "CONVERGED"
 
     # Check if compute_bader_charges is set to 1
@@ -147,22 +167,22 @@ function completed() {
     exit
 }
 
-function backup_calculation() {
+function backup_calculation {
     $JAPPSBASE/templates/backup-files.py --silent --suffix "${suffix}" --prefix "${prefix}" --padding "${padding}" "${backupfiles}"
 }
 
-function setup_restart() {
+function setup_restart {
     cp CONTCAR POSCAR
 
     # Replace NSW value in INCAR
     sed -i "s/NSW *= *[0-9]*/NSW = $REMAINING_TIMESTEPS/" INCAR
 }
 
-function clear_calculation() {
+function clear_calculation {
     rm $removefiles
 }
 
-function main(){
+function main {
     setup_environment
     check_convergence
     local convergence=$?
@@ -177,14 +197,14 @@ function main(){
             clear_calculation
             ;;
         2)
-            [ "${mail_fail}" == "TRUE" ] && send_mail "CONTCAR EMPTY"
+            [ "${mail_fail}" == "TRUE" ] && send_mail "CONTCAR INCOMPLETE"
             ;;
         3)
             [ "${mail_fail}" == "TRUE" ] && send_mail "MISSING STARTING FILES"
             ;;
     esac
 
-    resubmit
+    restart_from_checkpoint
     # Run the VASP job
     local EXECUTABLE=vasp_std
     touch WAVECAR CHGCAR CHG
@@ -204,7 +224,7 @@ function main(){
 # Email Notifications (TRUE/FALSE)
 mail_start="FALSE"     # At job start
 mail_converge="TRUE"   # On job convergence
-mail_resubmit="FALSE"  # On job resubmission
+mail_restart="FALSE"  # On job restart
 mail_fail="TRUE"       # On job failure
 
 # Backup Directory Filenames
@@ -213,13 +233,12 @@ suffix=""              # Suffix
 padding=2              # Number padding
 
 # Job Environment Settings
-resubmissions=20        # Max resubmission count
+max_restarts=20        # Max resubmission count
 OLD_SLURM_JOB_ID=${OLD_SLURM_JOB_ID:-$SLURM_JOB_ID}
 backupfiles="CONTCAR INCAR KPOINTS ICONST REPORT OSZICAR OUTCAR POSCAR XDATCAR *$OLD_SLURM_JOB_ID.o* *$OLD_SLURM_JOB_ID.e* vasprun.xml WAVECAR CHGCAR nodefile.$OLD_SLURM_JOB_ID"
 removefiles="OSZICAR DOSCAR EIGENVAL IBZKPT PCDAT PROCAR FORCECAR nodefile.$OLD_SLURM_JOB_ID *$OLD_SLURM_JOB_ID.o* *$OLD_SLURM_JOB_ID.e*"
-
-# Set the compute_bader_charges parameter (0 or 1)
 compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
+IS_MD_CALC=1  # Set this to 1 for MD calculations
 
 # Simulation Parameters
 if [ -z "$SUB" ]; then

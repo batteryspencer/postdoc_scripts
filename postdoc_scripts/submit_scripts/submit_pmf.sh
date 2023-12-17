@@ -59,10 +59,10 @@ function send_mail {
 }
 
 function check_contcar_completeness {
-    local poscar_header_lines=9
+    local contcar_header_lines=$(awk '/Cartesian|Direct/{print NR; exit}' CONTCAR)
     local separator_line=1
     local predictor_block_header_lines=3
-    local expected_lines=$((poscar_header_lines + 2 * NIONS + separator_line))
+    local expected_lines=$((contcar_header_lines + 2 * NIONS + separator_line))
     
     if [ "$IS_MD_CALC" -eq 1 ]; then
         expected_lines=$((expected_lines + separator_line + predictor_block_header_lines + 3 * NIONS))

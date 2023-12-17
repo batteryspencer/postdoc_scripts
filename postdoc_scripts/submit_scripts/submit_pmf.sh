@@ -168,7 +168,7 @@ function completed {
 }
 
 function backup_calculation {
-    $JAPPSBASE/templates/backup-files.py --silent --suffix "${suffix}" --prefix "${prefix}" --padding "${padding}" "${backupfiles}"
+    /depot/jgreeley/users/pasumarv/lib/templates/backup_files.py "$backupfiles" "$prefix" "$padding" "$((SUB - 1))"
 }
 
 function setup_restart {

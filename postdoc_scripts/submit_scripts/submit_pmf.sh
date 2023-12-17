@@ -88,8 +88,8 @@ function check_contcar_completeness {
 #   3 if OUTCAR is missing
 function check_convergence {
     COMPLETED_TIMESTEPS=0
-    local sub=${SUB:-1}
-    if [ $sub -gt 1 ]; then
+    local current_attempt=${JOB_ATTEMPT:-1}
+    if [ $current_attempt -gt 1 ]; then
         for outcar in ${prefix}*/OUTCAR; do
             if [ -f "$outcar" ]; then
                 loops=$(grep -c LOOP+ "$outcar")
@@ -126,11 +126,11 @@ function check_convergence {
 }
 
 function restart_from_checkpoint {
-    local sub=${SUB:-1}
-    sub=$(expr $sub + 1)
-    if [ $sub -le $max_restarts ]; then
-        [ "${mail_restart}" == "TRUE" ] && send_mail "RESUB:$(expr $sub - 1)"
-        CANCEL=$(sbatch --dependency="afterany:${SLURM_JOB_ID}" --export=ALL,SUB=$sub,OLD_SLURM_JOB_ID=$SLURM_JOB_ID,TOTAL_TIMESTEPS=$TOTAL_TIMESTEPS $0)
+    local current_attempt=${JOB_ATTEMPT:-1}
+    current_attempt=$(expr $current_attempt + 1)
+    if [ $current_attempt -le $max_restarts ]; then
+        [ "${mail_restart}" == "TRUE" ] && send_mail "RESUB:$(expr $current_attempt - 1)"
+        CANCEL=$(sbatch --dependency="afterany:${SLURM_JOB_ID}" --export=ALL,JOB_ATTEMPT=$current_attempt,OLD_SLURM_JOB_ID=$SLURM_JOB_ID,TOTAL_TIMESTEPS=$TOTAL_TIMESTEPS $0)
         CANCEL=$(echo $CANCEL | cut -d ' ' -f 4)
     fi
 }
@@ -168,7 +168,7 @@ function completed {
 }
 
 function backup_calculation {
-    /depot/jgreeley/users/pasumarv/lib/templates/backup_files.py "$backupfiles" "$prefix" "$padding" "$((SUB - 1))"
+    /depot/jgreeley/users/pasumarv/lib/templates/backup_files.py "$backupfiles" "$prefix" "$padding" "$((JOB_ATTEMPT - 1))"
 }
 
 function setup_restart {
@@ -229,7 +229,6 @@ mail_fail="TRUE"       # On job failure
 
 # Backup Directory Filenames
 prefix="RUN_"          # Prefix
-suffix=""              # Suffix
 padding=2              # Number padding
 
 # Job Environment Settings
@@ -241,7 +240,7 @@ compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 IS_MD_CALC=1  # Set this to 1 for MD calculations
 
 # Simulation Parameters
-if [ -z "$SUB" ]; then
+if [ -z "$JOB_ATTEMPT" ]; then
     TOTAL_TIMESTEPS=$(grep 'NSW' INCAR | awk -F ' *= *' '{print $2}')
 fi
 

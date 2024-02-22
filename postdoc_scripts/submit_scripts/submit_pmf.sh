@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- SBATCH Options ---
-#SBATCH --job-name=Pt111_PMF_1PropylH_C-H_1.11
+#SBATCH --job-name=Pt111_PMF_2PropylH_C-H_1.09
 #SBATCH --output=job_%j.out
 #SBATCH --error=job_%j.err
 #SBATCH --nodes=4
@@ -71,8 +71,10 @@ function check_contcar_completeness {
     local actual_lines=$(wc -l < CONTCAR)
 
     if [ "$actual_lines" -eq "$expected_lines" ]; then
+        echo "CONTCAR is complete"
         return 0  # CONTCAR is complete (success)
     else
+        echo "CONTCAR is incomplete"
         return 1  # CONTCAR is incomplete (failure)
     fi
 }
@@ -112,6 +114,7 @@ function check_convergence {
         if [ $COMPLETED_TIMESTEPS -ge $TOTAL_TIMESTEPS ]; then
             return 0
         elif check_contcar_completeness; then
+            echo "complete CONTCAR is found"
             return 1
         else
             return 2
@@ -229,6 +232,7 @@ mail_fail="TRUE"       # On job failure
 
 # Backup Directory Filenames
 prefix="RUN_"          # Prefix
+suffix=""              # Suffix
 padding=2              # Number padding
 
 # Job Environment Settings
@@ -236,6 +240,8 @@ max_restarts=20        # Max resubmission count
 OLD_SLURM_JOB_ID=${OLD_SLURM_JOB_ID:-$SLURM_JOB_ID}
 backupfiles="CONTCAR INCAR KPOINTS ICONST REPORT OSZICAR OUTCAR POSCAR XDATCAR *$OLD_SLURM_JOB_ID.o* *$OLD_SLURM_JOB_ID.e* vasprun.xml WAVECAR CHGCAR nodefile.$OLD_SLURM_JOB_ID"
 removefiles="OSZICAR DOSCAR EIGENVAL IBZKPT PCDAT PROCAR FORCECAR nodefile.$OLD_SLURM_JOB_ID *$OLD_SLURM_JOB_ID.o* *$OLD_SLURM_JOB_ID.e*"
+
+# Set the compute_bader_charges parameter (0 or 1)
 compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 IS_MD_CALC=1  # Set this to 1 for MD calculations
 

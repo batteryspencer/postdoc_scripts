@@ -187,6 +187,11 @@ function clear_calculation {
 
 function main {
     setup_environment
+
+    if [ -z "$JOB_ATTEMPT" ]; then
+        TOTAL_TIMESTEPS=$(grep 'NSW' INCAR | awk -F ' *= *' '{print $2}')
+    fi
+
     check_convergence
     local convergence=$?
 
@@ -242,11 +247,6 @@ removefiles="OSZICAR DOSCAR EIGENVAL IBZKPT PCDAT PROCAR FORCECAR nodefile.$OLD_
 # Set the compute_bader_charges parameter (0 or 1)
 compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 IS_MD_CALC=1  # Set this to 1 for MD calculations
-
-# Simulation Parameters
-if [ -z "$JOB_ATTEMPT" ]; then
-    TOTAL_TIMESTEPS=$(grep 'NSW' INCAR | awk -F ' *= *' '{print $2}')
-fi
 
 # --- Execute Main Logic ---
 main

@@ -210,9 +210,7 @@ function main {
     restart_from_checkpoint
     # Run the VASP job
     local EXECUTABLE=vasp_std
-    touch WAVECAR CHGCAR CHG
     srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE
-    echo $(date) $SLURM_JOB_ID $SLURM_SUBMIT_HOST $SLURM_JOB_NAME $SLURM_SUBMIT_DIR >> ~/jobs.log
 
     check_convergence
     convergence=$?

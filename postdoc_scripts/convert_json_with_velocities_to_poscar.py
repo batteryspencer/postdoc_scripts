@@ -3,7 +3,10 @@ import math
 from ase.io import read, write
 
 def custom_format_adjusted(v):
-    exponent = int(math.floor(math.log10(abs(v))))
+    if v == 0:
+        exponent = -1
+    else:
+        exponent = int(math.floor(math.log10(abs(v))))
     mantissa = v / (10 ** exponent)
     if v < 0:
         return '{:.8f}E{:+03d}'.format(mantissa / 10, exponent + 1)

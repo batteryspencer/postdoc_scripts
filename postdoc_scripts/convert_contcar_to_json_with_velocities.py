@@ -12,15 +12,17 @@ with open(contcar_path, 'r') as file:
     lines = file.readlines()
 
 # The line number where velocities start (adjust based on your file)
-start_line_velocities = 137  # Adjust this number as needed
+velocity_start_line_number = 137  # Adjust this number as needed
+velocity_start_line_index = velocity_start_line_number - 1
 
 # Skip blank lines if present
-while not lines[start_line_velocities].strip():
-    start_line_velocities += 1
+while not lines[velocity_start_line_index].strip():
+    velocity_start_line_number += 1
+    velocity_start_line_index += 1
 
 # Reading Velocities
 velocities = []
-for line in lines[start_line_velocities:start_line_velocities + len(atoms)]:
+for line in lines[velocity_start_line_index:velocity_start_line_index + len(atoms) + 1]:
     if line.strip():  # This checks if the line is not empty
         velocities.append([float(v) for v in line.split()])
 

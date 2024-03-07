@@ -69,6 +69,52 @@ def plot_values(values, target_value, ylabel, title, file_name):
     plt.legend()
     plt.savefig(file_name)
 
+def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name):
+    plt.figure(figsize=(10, 6)) 
+    
+    # Convert time step to seconds
+    timestep_s = timestep_fs * 1e-15  # Convert fs to s
+
+    # Compute the sampling frequency in Hz (assuming uniform time steps)
+    sampling_frequency_hz = 1 / timestep_s
+    
+    # Compute the FFT and corresponding frequencies in Hz
+    fft_values = np.fft.fft(values)
+    fft_freq_hz = np.fft.fftfreq(len(values), d=timestep_s)
+
+    # Convert frequencies to THz from Hz
+    fft_freq_thz = fft_freq_hz * 1e-12  # Convert Hz to THz
+    
+    # Only take the positive half of the spectrum and corresponding frequencies
+    half_n = len(fft_values) // 2
+    fft_values = np.abs(fft_values[:half_n])
+    fft_freq_thz = fft_freq_thz[:half_n]
+
+    # Find the index where the frequency is greater than zero to skip the 0 THz component
+    non_zero_index = np.where(fft_freq_thz > 0)[0][0]
+    
+    # Plot starting from the first non-zero frequency
+    plt.plot(fft_freq_thz[non_zero_index:], fft_values[non_zero_index:], label=ylabel)
+
+    # Exclude the zero frequency component before identifying the characteristic frequency
+    valid_indices = np.where(fft_freq_thz > 0)
+    characteristic_freq_index = np.argmax(fft_values[valid_indices])
+    characteristic_frequency = fft_freq_thz[valid_indices][characteristic_freq_index]
+    characteristic_amplitude = fft_values[valid_indices][characteristic_freq_index]
+
+    # Print the characteristic frequency and its amplitude
+    print(f"The characteristic frequency of the system is {characteristic_frequency:.2f} THz with an amplitude of {characteristic_amplitude:.2f}")
+
+    # Print the non-zero frequencies and corresponding FFT values side by side
+    # for freq, amp in zip(fft_freq_thz[non_zero_index:], fft_values[non_zero_index:]):
+    #     print(f"{freq:.2f} THz, {amp:.2f}")
+
+    plt.xlabel('Frequency (THz)')
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.savefig(file_name)
+
 def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=None, x_label='Block Number', y_label='Value', title='Block Averages and Std Dev', filename='block_averages_std_dev.png'):
     # Ensure there's enough data to form the requested number of blocks
     if len(data_series) < num_blocks:
@@ -146,6 +192,10 @@ def main():
     # Plotting temperature and energy trends
     plot_values(total_temperatures, target_temperature, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
     plot_values(total_energies, target_energy, 'Energy (eV)', 'Energy per Ionic Step Across Simulation', 'energy_trend.png')
+
+    # Plotting Fourier transform
+    timestep_fs = 1.0
+    plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png')
 
     # Plotting block averages
     compute_and_plot_block_averages(temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')

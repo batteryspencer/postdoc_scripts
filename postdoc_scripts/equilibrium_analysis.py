@@ -87,6 +87,15 @@ def autocorrelation(x):
     result /= np.max(result)
     return result
 
+def compute_vacf(velocities):
+    num_steps, num_atoms, _ = velocities.shape
+    vacf = np.zeros(num_steps)
+    for i in range(num_atoms):
+        for j in range(3):  # x, y, z components
+            vacf += autocorrelation(velocities[:, i, j])
+    vacf /= (num_atoms * 3)
+    return vacf
+
 def plot_values(values, target_value, ylabel, title, file_name):
     plt.figure(figsize=(10, 6))
     steps = range(len(values))

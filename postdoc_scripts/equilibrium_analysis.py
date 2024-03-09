@@ -40,6 +40,46 @@ def read_temperatures_from_outcar(file_path):
         print(f"File not found: {file_path}")
     return temperatures
 
+def get_num_atoms_from_outcar(outcar_path):
+    num_atoms = 0
+    with open(outcar_path, 'r') as file:
+        for line in file:
+            if "NIONS" in line:
+                num_atoms = int(line.split('=')[-1].strip())
+                break
+    if num_atoms == 0:
+        raise ValueError("Unable to find NIONS in the OUTCAR file.")
+    return num_atoms
+
+def read_velocities_from_vdatcar(file_path, num_atoms):
+    velocities = []
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    
+    reading_velocities = False
+    for line in lines:
+        if 'Direct configuration=' in line:  # Start of a new set of velocities
+            reading_velocities = True
+            continue
+        if reading_velocities:
+            if line.strip() and 'KINETIC ENERGY' not in line and 'TEMP EFF' not in line:
+                # Read velocities only if the line is not empty and does not contain these keywords
+                try:
+                    velocity = [float(val) for val in line.split()]
+                    if len(velocity) == 3:  # Ensure there are exactly three components
+                        velocities.append(velocity)
+                except ValueError:
+                    # Handle the case where conversion to float fails
+                    continue
+
+    velocities = np.array(velocities)
+    num_timesteps = len(velocities) // num_atoms
+
+    if len(velocities) != num_atoms * num_timesteps:
+        raise ValueError("Mismatch in the expected number of velocity entries and the actual count.")
+
+    return velocities.reshape((num_timesteps, num_atoms, 3))
+
 def autocorrelation(x):
     n = len(x)
     x = x - np.mean(x)

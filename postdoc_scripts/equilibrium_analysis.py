@@ -118,7 +118,7 @@ def plot_values(values, target_value, ylabel, title, file_name):
     plt.legend()
     plt.savefig(file_name)
 
-def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name):
+def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_type="Data"):
     plt.figure(figsize=(10, 6)) 
     
     # Convert time step to seconds
@@ -151,8 +151,8 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name):
     characteristic_frequency = fft_freq_thz[valid_indices][characteristic_freq_index]
     characteristic_amplitude = fft_values[valid_indices][characteristic_freq_index]
 
-    # Print the characteristic frequency and its amplitude
-    print(f"The characteristic frequency of the system is {characteristic_frequency:.2f} THz with an amplitude of {characteristic_amplitude:.2f}")
+    # Print the characteristic frequency and its amplitude with data type
+    print(f"The characteristic frequency of the system from {data_type} is {characteristic_frequency:.2f} THz with an amplitude of {characteristic_amplitude:.2f}")
 
     # Print the non-zero frequencies and corresponding FFT values side by side
     # for freq, amp in zip(fft_freq_thz[non_zero_index:], fft_values[non_zero_index:]):
@@ -262,7 +262,7 @@ def main():
 
     # Plotting Fourier transform
     timestep_fs = 1.0
-    plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png')
+    plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
 
     # Plotting block averages
     compute_and_plot_block_averages(temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')
@@ -271,6 +271,12 @@ def main():
     # Plotting autocorrelation functions
     plot_autocorrelation(total_temperatures, 'Temperature')
     plot_autocorrelation(total_energies, 'Energy')
+    vacf = compute_vacf(total_velocities)
+    plot_vacf(vacf, timestep_fs)
+
+    # Plotting Fourier transform
+    timestep_fs = 1.0
+    plot_fourier_transform(vacf, timestep_fs, 'Amplitude', 'Fourier Transform of Velocity Fluctuations', 'velocity_fourier_transform.png', 'VACF')
 
 if __name__ == "__main__":
     main()

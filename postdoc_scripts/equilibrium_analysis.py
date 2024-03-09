@@ -216,11 +216,29 @@ def plot_autocorrelation(values, ylabel):
     plt.legend()
     plt.savefig(f'{ylabel.lower()}_autocorrelation.png')
 
+def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='vacf.png'):
+    plt.figure(figsize=(10, 6))
+    time = np.arange(len(vacf)) * timestep_fs  # Convert step number to actual time
+    plt.plot(time, vacf, label=ylabel)
+    plt.axhline(0.0, color='r', linestyle='dashed', linewidth=1)
+
+    plt.xlabel('Time (fs)')
+    plt.ylabel(ylabel)
+    plt.title(f'{ylabel} Function')
+    plt.legend()
+    plt.savefig(filename)
+
 def main():
     run_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('RUN_')])
     run_dirs.append('.')  # Include the current directory
+
     total_temperatures = []
     total_energies = []
+
+    # Assume VDATCAR is in the current directory or a specified path
+    vdatcar_path = 'VDATCAR'  # Update this path if VDATCAR is in a different location
+    num_atoms = get_num_atoms_from_outcar('OUTCAR')
+    total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
     for run_dir in run_dirs:
         outcar_path = os.path.join(run_dir, 'OUTCAR')

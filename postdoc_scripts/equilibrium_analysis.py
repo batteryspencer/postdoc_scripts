@@ -118,6 +118,14 @@ def plot_values(values, target_value, ylabel, title, file_name):
     plt.legend()
     plt.savefig(file_name)
 
+def print_top_frequencies(frequencies, amplitudes, data_type, top_n):
+    print(f"\n{data_type} - Top {top_n} Frequencies:")
+    print("-------------------------------------------")
+    print("Rank | Frequency (THz) | Amplitude")
+    print("-----|-----------------|-----------")
+    for i in range(top_n):
+        print(f"{i+1:<4} | {frequencies[i]:<15.2f} | {amplitudes[i]:<10.2f}")
+
 def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_type="Data"):
     plt.figure(figsize=(10, 6)) 
     
@@ -139,24 +147,29 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_t
     fft_values = np.abs(fft_values[:half_n])
     fft_freq_thz = fft_freq_thz[:half_n]
 
-    # Find the index where the frequency is greater than zero to skip the 0 THz component
-    non_zero_index = np.where(fft_freq_thz > 0)[0][0]
-    
-    # Plot starting from the first non-zero frequency
-    plt.plot(fft_freq_thz[non_zero_index:], fft_values[non_zero_index:], label=ylabel)
+    # Plot the FFT spectrum
+    plt.plot(fft_freq_thz, fft_values, label=ylabel)
 
-    # Exclude the zero frequency component before identifying the characteristic frequency
-    valid_indices = np.where(fft_freq_thz > 0)
-    characteristic_freq_index = np.argmax(fft_values[valid_indices])
-    characteristic_frequency = fft_freq_thz[valid_indices][characteristic_freq_index]
-    characteristic_amplitude = fft_values[valid_indices][characteristic_freq_index]
+    # Exclude zero frequency
+    nonzero_indices = np.where(fft_freq_thz > 0)[0]
+    fft_values_nonzero = fft_values[nonzero_indices]
+    fft_freq_thz_nonzero = fft_freq_thz[nonzero_indices]
 
-    # Print the characteristic frequency and its amplitude with data type
-    print(f"The characteristic frequency of the system from {data_type} is {characteristic_frequency:.2f} THz with an amplitude of {characteristic_amplitude:.2f}")
+    # Define the number of top frequencies you are interested in
+    top_n = 20
 
-    # Print the non-zero frequencies and corresponding FFT values side by side
-    # for freq, amp in zip(fft_freq_thz[non_zero_index:], fft_values[non_zero_index:]):
-    #     print(f"{freq:.2f} THz, {amp:.2f}")
+    # Sort amplitudes and frequencies in descending order based on amplitudes
+    sorted_indices = np.argsort(fft_values_nonzero)[::-1]  # Get indices for sorted amplitudes in descending order
+    sorted_amplitudes = fft_values_nonzero[sorted_indices]
+    sorted_frequencies = fft_freq_thz_nonzero[sorted_indices]
+
+    # Select the top N frequencies and their amplitudes
+    top_indices = sorted_indices[:top_n]
+    top_frequencies = fft_freq_thz_nonzero[top_indices]
+    top_amplitudes = fft_values_nonzero[top_indices]
+
+    # Print the top frequencies for temperature fluctuations
+    print_top_frequencies(top_frequencies, top_amplitudes, data_type, top_n)
 
     plt.xlabel('Frequency (THz)')
     plt.ylabel(ylabel)

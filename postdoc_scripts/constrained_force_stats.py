@@ -23,6 +23,11 @@ def read_simulation_data(folder_name):
     
     return lambda_values, force_values_on_constrained_bond, md_steps
 
+def calculate_statistics(lambda_values_per_cv):
+    mean_force = np.mean(lambda_values_per_cv)
+    standard_deviation = np.std(lambda_values_per_cv)
+    return mean_force, standard_deviation
+
 def main():
     constraint_index = 0  # Specify the index of the constraint of interest
     num_constraints = get_file_line_count('ICONST')
@@ -40,5 +45,9 @@ def main():
         all_lambda_values.extend(lambda_values)
         all_cv_values.extend(cv_values)
         total_md_steps += md_steps  # Accumulate total MD steps here
+    
+    lambda_values_per_cv = all_lambda_values[constraint_index::num_constraints]
+    mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
+    
 if __name__ == "__main__":
     main()

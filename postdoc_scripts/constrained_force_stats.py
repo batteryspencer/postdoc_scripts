@@ -32,6 +32,20 @@ def calculate_statistics(lambda_values_per_cv):
     standard_deviation = np.std(lambda_values_per_cv)
     return mean_force, standard_deviation
 
+def cumulative_force_analysis(force_values):
+    cumulative_means = []
+    cumulative_stds = []
+    cumulative_intervals = []
+
+    total_number = len(force_values)
+    if total_number >= 500:
+        for i in range(500, total_number + 1, 500):
+            cumulative_intervals.append(i)
+            cumulative_means.append(np.mean(force_values[:i]))
+            cumulative_stds.append(np.std(force_values[:i]))
+
+    return cumulative_intervals, cumulative_means, cumulative_stds
+
 def main():
     constraint_index = 0  # Specify the index of the constraint of interest
     num_constraints = get_file_line_count('ICONST')
@@ -60,5 +74,16 @@ def main():
     
     print(f'The mean and the std of the mean force is: {mean_force:.2f} and {std_dev:.2f}, sampled over {total_md_steps} fs')
     
+    cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
+
+    # Plotting enhancements for clarity
+    plt.figure()
+    plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, fmt='o-', label='Cumulative Mean Force')
+    plt.xlabel('Simulation Interval (Number of Data Points)')
+    plt.ylabel('Force (Arbitrary Units)')
+    plt.title('Cumulative Analysis of Mean Force Over Simulation Intervals')
+    plt.legend()
+    plt.savefig('cumulative_force_stats.png', dpi=100)  # Updated file name for clarity
+
 if __name__ == "__main__":
     main()

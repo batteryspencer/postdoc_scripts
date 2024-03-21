@@ -1,3 +1,7 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from glob import glob
+
 def get_file_line_count(filename):
     with open(filename) as f:
         for i, l in enumerate(f):
@@ -48,6 +52,13 @@ def main():
     
     lambda_values_per_cv = all_lambda_values[constraint_index::num_constraints]
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
+    
+    with open('force_stats_report.txt', 'w') as output_file:
+        output_file.write('CV, Mean Force, Standard Deviation\n')
+        output_file.write(f'{all_cv_values[0]:.2f}, {mean_force:.2f}, {std_dev:.2f}\n')
+        output_file.write(f'MD steps = {total_md_steps} fs')  # Use the accumulated total MD steps
+    
+    print(f'The mean and the std of the mean force is: {mean_force:.2f} and {std_dev:.2f}, sampled over {total_md_steps} fs')
     
 if __name__ == "__main__":
     main()

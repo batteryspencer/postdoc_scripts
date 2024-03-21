@@ -40,17 +40,33 @@ x = df['Constrained_Length'].to_numpy()
 y = df['Mean_Force'].to_numpy()
 std_dev = df['Standard_Deviation'].to_numpy()
 
-# Activation barrier using the trapezoidal rule
-activation_barrier = trapz(y, x)
+# Find zero crossings
+zero_crossings = np.where(np.diff(np.sign(y)))[0]
 
-# Calculate the uncertainty in the activation barrier
-segment_widths = np.diff(x)
-segment_errors = np.round(std_dev[:-1] * segment_widths, 2)
-activation_barrier_error = np.round(np.sqrt(np.sum(segment_errors[1:-1] * segment_errors[1:-1])), 2)
+# Initialize the variables to store the results
+activation_barrier = None
+activation_barrier_error = None
+
+# Check if there are at least two zero crossings to define bounds
+if len(zero_crossings) >= 2:
+    # Use the first two zero crossings as an example
+    start, end = zero_crossings[0], zero_crossings[1]
+
+    # Compute the activation barrier (area under the curve) between these two crossings
+    activation_barrier = trapz(y[start:end + 1], x[start:end + 1])
+
+    # Calculate the uncertainty in the activation barrier
+    segment_widths = np.diff(x[start:end + 1])
+    segment_errors = np.round(std_dev[start:end] * segment_widths, 2)
+    activation_barrier_error = np.round(np.sqrt(np.sum(segment_errors ** 2)), 2)
+
+if activation_barrier is not None and activation_barrier_error is not None:
+    results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
+else:
+    results_string = "Not enough zero crossings found to compute the area and its error."
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)
-results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
 print(table_string)
 print(results_string)
 with open("pmf_analysis_results.txt", "w") as text_file:

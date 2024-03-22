@@ -52,7 +52,7 @@ def main():
     total_md_steps = 0  # Initialize total MD steps accumulator
 
     with open("INCAR", "r") as file:
-        time_step = next((line.split('=')[1].strip() for line in file if "POTIM" in line), None)
+        time_step = float(next((line.split('=')[1].strip() for line in file if "POTIM" in line), None))
 
     folders = sorted(glob('RUN_*'), key=lambda x: int(x.split('_')[1])) + ['.']
     

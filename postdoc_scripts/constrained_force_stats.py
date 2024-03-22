@@ -51,6 +51,9 @@ def main():
     num_constraints = get_file_line_count('ICONST')
     total_md_steps = 0  # Initialize total MD steps accumulator
 
+    with open("INCAR", "r") as file:
+        time_step = next((line.split('=')[1].strip() for line in file if "POTIM" in line), None)
+
     folders = sorted(glob('RUN_*'), key=lambda x: int(x.split('_')[1])) + ['.']
     
     print(f'Integrating over Reaction Coordinate Index: {constraint_index}, with a total of {num_constraints} constraints')
@@ -70,9 +73,9 @@ def main():
     with open('force_stats_report.txt', 'w') as output_file:
         output_file.write('CV, Mean Force, Standard Deviation\n')
         output_file.write(f'{all_cv_values[0]:.2f}, {mean_force:.2f}, {std_dev:.2f}\n')
-        output_file.write(f'MD steps = {total_md_steps} fs')  # Use the accumulated total MD steps
+        output_file.write(f'MD steps = {total_md_steps}')  # Use the accumulated total MD steps
     
-    print(f'The mean and the std of the mean force is: {mean_force:.2f} and {std_dev:.2f}, sampled over {total_md_steps} fs')
+    print(f'The mean of the forces is: {mean_force:.2f} with a standard deviation of {std_dev:.2f}, sampled over {total_md_steps * time_step:.1f} fs using a {time_step:.1f} fs time step.')
     
     cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
 
@@ -87,3 +90,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

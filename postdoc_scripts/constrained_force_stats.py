@@ -76,11 +76,15 @@ def main():
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
     
     with open('force_stats_report.txt', 'w') as output_file:
-        output_file.write('CV, Mean Force, Standard Deviation\n')
-        output_file.write(f'{all_cv_values[0]:.2f}, {mean_force:.2f}, {std_dev:.2f}\n')
-        output_file.write(f'MD steps = {total_md_steps}')  # Use the accumulated total MD steps
-    
-    print(f'The mean of the forces is: {mean_force:.2f} with a standard deviation of {std_dev:.2f}, sampled over {total_md_steps * time_step:.1f} fs using a {time_step:.1f} fs time step.')
+        output_file.write(f'CV: {all_cv_values[0]:.2f}\n')
+        output_file.write(f'Mean Force: {mean_force:.2f}\n')
+        output_file.write(f'Standard Deviation: {std_dev:.2f}\n')
+        output_file.write(f'MD steps: {total_md_steps}\n')  # Use the accumulated total MD steps
+
+    print(f'CV: {all_cv_values[0]:.2f}')
+    print(f'Mean Force: {mean_force:.2f}')
+    print(f'Standard Deviation: {std_dev:.2f}')
+    print(f'Sampled over {total_md_steps * time_step:.1f} fs using a {time_step:.1f} fs time step.')
     
     cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
 

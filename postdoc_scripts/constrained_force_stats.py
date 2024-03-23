@@ -61,8 +61,6 @@ def main():
 
     folders = sorted(glob('RUN_*'), key=lambda x: int(x.split('_')[1])) + ['.']
     
-    print(f'Integrating over Reaction Coordinate Index: {constraint_index}, with a total of {num_constraints} constraints')
-    
     all_lambda_values = []
     all_cv_values = []
     
@@ -74,19 +72,25 @@ def main():
     
     lambda_values_per_cv = all_lambda_values[constraint_index::num_constraints]
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
+    cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
     
     with open('force_stats_report.txt', 'w') as output_file:
+        output_file.write(f'Integrating over Reaction Coordinate Index: {constraint_index}, with a total of {num_constraints} constraints\n')
         output_file.write(f'CV: {all_cv_values[0]:.2f}\n')
         output_file.write(f'Mean Force: {mean_force:.2f}\n')
         output_file.write(f'Standard Deviation: {std_dev:.2f}\n')
-        output_file.write(f'MD steps: {total_md_steps}\n')  # Use the accumulated total MD steps
+        output_file.write(f'MD steps: {total_md_steps}\n')
 
-    print(f'CV: {all_cv_values[0]:.2f}')
-    print(f'Mean Force: {mean_force:.2f}')
-    print(f'Standard Deviation: {std_dev:.2f}')
-    print(f'Sampled over {total_md_steps * time_step:.1f} fs using a {time_step:.1f} fs time step.')
-    
-    cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
+        # # Write cumulative analysis results to the file
+        # output_file.write("\nCumulative Analysis Results:\n")
+        # output_file.write("Interval\tCumulative Mean\tCumulative Std\n")
+        # for interval, mean, std in zip(cumulative_intervals, cumulative_means, cumulative_stds):
+        #     output_file.write(f"{interval}\t\t{mean:.2f}\t\t{std:.2f}\n")
+        # Write cumulative analysis results to the file with aligned formatting
+        output_file.write("Cumulative Analysis Results:\n")
+        output_file.write(f"{'Interval':>10}{'Cumulative Mean':>20}{'Cumulative Std':>20}\n")
+        for interval, mean, std in zip(cumulative_intervals, cumulative_means, cumulative_stds):
+            output_file.write(f"{interval:>10}{mean:>20.2f}{std:>20.2f}\n")
 
     plt.figure()
     plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, fmt='o-', label='Cumulative Mean Force')

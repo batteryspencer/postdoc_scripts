@@ -8,7 +8,8 @@ def get_file_line_count(filename):
             pass
     return i + 1
 
-def read_simulation_data(folder_name):
+# Modified function to include max_steps parameter
+def read_simulation_data(folder_name, max_steps=None):
     lambda_values = []
     force_values_on_constrained_bond = []
     md_steps = 0
@@ -24,6 +25,9 @@ def read_simulation_data(folder_name):
                     print('Error parsing collective variable value')
             if "MD step No." in line:
                 md_steps += 1
+                # Break the loop if the number of steps reaches max_steps
+                if max_steps is not None and md_steps >= max_steps:
+                    break
     
     return lambda_values, force_values_on_constrained_bond, md_steps
 
@@ -50,6 +54,7 @@ def main():
     constraint_index = 0  # Specify the index of the constraint of interest
     num_constraints = get_file_line_count('ICONST')
     total_md_steps = 0  # Initialize total MD steps accumulator
+    max_steps = None  # Specify the maximum number of steps to consider for analysis
 
     with open("INCAR", "r") as file:
         time_step = float(next((line.split('=')[1].strip() for line in file if "POTIM" in line), None))
@@ -62,7 +67,7 @@ def main():
     all_cv_values = []
     
     for folder in folders:
-        lambda_values, cv_values, md_steps = read_simulation_data(folder)
+        lambda_values, cv_values, md_steps = read_simulation_data(folder, max_steps=max_steps)
         all_lambda_values.extend(lambda_values)
         all_cv_values.extend(cv_values)
         total_md_steps += md_steps  # Accumulate total MD steps here
@@ -79,7 +84,6 @@ def main():
     
     cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
 
-    # Plotting enhancements for clarity
     plt.figure()
     plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, fmt='o-', label='Cumulative Mean Force')
     plt.xlabel('Simulation Interval (Number of Data Points)')

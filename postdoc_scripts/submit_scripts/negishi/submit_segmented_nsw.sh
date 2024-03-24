@@ -191,6 +191,7 @@ function main {
                 # Directories starting with 'seg' exist but are incomplete
                 rm -rf "seg"$last_seg
             fi
+        done
     else
         # Directories starting with 'seg' do not exist
         last_seg=0

@@ -128,6 +128,15 @@ function main {
         rm -f $file
     done
 
+    # Check if compute_bader_charges is set to 1
+    if [ "$compute_bader_charges" -eq 1 ]; then
+        cd seg$seg
+        echo
+        echo "Evaluating Bader charges:"
+        bader CHGCAR
+        cd ..
+    fi
+
 }
 
 ####################################################
@@ -137,6 +146,9 @@ function main {
 # define a list of files
 duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"
 removefiles="WAVECAR"
+
+# Set the compute_bader_charges parameter (0 or 1)
+compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 
 # --- Execute Main Logic ---
 main

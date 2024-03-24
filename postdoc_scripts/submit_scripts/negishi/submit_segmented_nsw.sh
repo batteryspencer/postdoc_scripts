@@ -43,6 +43,27 @@ function log_job_details {
     NIONS=$(sed -n '7p' POSCAR | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum}')
 }
 
+function check_contcar_completeness {
+    local contcar_header_lines=$(awk '/Cartesian|Direct/{print NR; exit}' CONTCAR)
+    local separator_line=1
+    local predictor_block_header_lines=3
+    local expected_lines=$((contcar_header_lines + 2 * NIONS + separator_line))
+    
+    if [ "$IS_MD_CALC" -eq 1 ]; then
+        expected_lines=$((expected_lines + separator_line + predictor_block_header_lines + 3 * NIONS))
+    fi
+
+    local actual_lines=$(wc -l < CONTCAR)
+
+    if [ "$actual_lines" -eq "$expected_lines" ]; then
+        # CONTCAR is complete
+        return 0
+    else
+        # CONTCAR is incomplete
+        return 1
+    fi
+}
+
 function setup_simulation_directory {
     # Create segment directory if they don't exist
     seg=$(printf "%0${number_padding}d" $seg)

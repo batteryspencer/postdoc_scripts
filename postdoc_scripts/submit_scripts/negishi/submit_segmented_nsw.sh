@@ -14,18 +14,9 @@
 #SBATCH --mail-user=pasumarv@purdue.edu
 #SBATCH --mail-type=END
 
-# Start timing
-start_time=$(date +%s)
-
 # Define the source and target paths
 source_path="/depot/jgreeley/users/pasumarv/lib/vdw_kernel.bindat"
 target_path="vdw_kernel.bindat"
-
-# Check if the symbolic link already exists
-if [ ! -L "$target_path" ]; then
-    # Create the symbolic link
-    ln -s "$source_path" "$target_path"
-fi
 
 function setup_environment {
     cd $SLURM_SUBMIT_DIR
@@ -52,28 +43,87 @@ function log_job_details {
     NIONS=$(sed -n '7p' POSCAR | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum}')
 }
 
+function log_execution_time {
+    # End timing
+    end_time=$(date +%s)
+    execution_time=$((end_time - start_time))
+
+    # Calculate hours, minutes, and seconds
+    hours=$((execution_time / 3600))
+    minutes=$(( (execution_time % 3600) / 60 ))
+    seconds=$((execution_time % 60))
+
+    # Print the execution time
+    echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)" >> job.out
+}
+
 function main {
     setup_environment
 
-    # Run the VASP job
+    # Define the total NSW and the segment size
+    total_nsw=10
+    segment_size=5
+
+    # Calculate the number of segments
+    num_segments=$((total_nsw / segment_size))
+
+    # Modify INCAR file to set NSW to segment size
+    sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$segment_size"'/' INCAR
+
+    # Define the VASP executable
     local EXECUTABLE=vasp_std
-    srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE
+
+    for seg in $(seq 1 $num_segments)
+    do
+        # Create segment directory if they don't exist
+        seg=$(printf "%02d" $seg)
+        mkdir -p "seg"$seg
+
+        # Change to the segment directory
+        cd "seg"$seg
+
+        # Check if the symbolic link already exists
+        if [ ! -L "$target_path" ]; then
+            # Create the symbolic link
+            ln -s "$source_path" "$target_path"
+        fi
+
+        # Copy files to the segment directory
+        if [ $seg -eq 1 ]; then
+            cp ../{INCAR,ICONST,KPOINTS,POSCAR,POTCAR} .
+        else
+            cp ../seg$(printf "%02d" $((seg - 1)))/CONTCAR POSCAR
+            cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
+        fi
+
+        # Start timing
+        start_time=$(date +%s)
+
+        # Run the VASP job
+        srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE > job.out 2> job.err
+
+        log_execution_time
+
+        # Remove the files from the current directory
+        for file in $removefiles; do
+            rm -f $file
+        done
+
+        # Change back to the parent directory
+        cd ..
+    done
+
+    # Remove duplicate files
+    for file in $duplicatefiles; do
+        rm -f $file
+    done
 
 }
 
+# define a list of files to be backed up
+# movefiles="OUTCAR vasprun.xml job.out job.err XDATCAR OSZICAR REPORT EIGENVAL IBZKPT PCDAT CHG CHGCAR DOSCAR"
+duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"
+removefiles="WAVECAR"
+
 # --- Execute Main Logic ---
 main
-
-# End timing
-end_time=$(date +%s)
-execution_time=$((end_time - start_time))
-
-# Calculate hours, minutes, and seconds
-hours=$((execution_time / 3600))
-minutes=$(( (execution_time % 3600) / 60 ))
-seconds=$((execution_time % 60))
-
-# Print the execution time
-echo 
-echo "Job execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)"
-

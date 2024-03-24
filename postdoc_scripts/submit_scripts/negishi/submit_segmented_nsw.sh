@@ -45,7 +45,7 @@ function log_job_details {
 
 function setup_simulation_directory {
     # Create segment directory if they don't exist
-    seg=$(printf "%02d" $seg)
+    seg=$(printf "%0${number_padding}d" $seg)
     mkdir -p "seg"$seg
 
     # Change to the segment directory
@@ -61,7 +61,7 @@ function setup_simulation_directory {
     if [ $seg -eq 1 ]; then
         cp ../{INCAR,ICONST,KPOINTS,POSCAR,POTCAR} .
     else
-        cp ../seg$(printf "%02d" $((seg - 1)))/CONTCAR POSCAR
+        cp ../seg$(printf "%0${number_padding}d" $((seg - 1)))/CONTCAR POSCAR
         cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
     fi
 
@@ -142,6 +142,8 @@ function main {
 ####################################################
 #                 USER VARIABLES                   #
 ####################################################
+
+number_padding=2
 
 # define a list of files
 duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"

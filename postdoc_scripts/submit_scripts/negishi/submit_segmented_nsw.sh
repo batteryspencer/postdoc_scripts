@@ -64,6 +64,47 @@ function check_contcar_completeness {
     fi
 }
 
+# Check if OUTCAR and CONTCAR are complete
+function check_convergence_of_last_segment {
+    # Change to the last segment directory
+    cd "seg"$(printf "%0${number_padding}d" $last_seg)
+
+    # Check if OUTCAR is complete
+    if [ -f "OUTCAR" ]; then
+        completed_timesteps=$(grep -c LOOP+ "OUTCAR")
+        if [ "$completed_timesteps" -eq "$segment_size" ]; then
+            # OUTCAR is complete
+            outcar_complete=0
+        else
+            # OUTCAR is incomplete
+            outcar_complete=1
+        fi
+    else
+        # OUTCAR is missing
+        outcar_complete=2
+    fi
+
+    # Check if CONTCAR is complete
+    if [ -f "CONTCAR" ]; then
+        if check_contcar_completeness; then
+            # CONTCAR is complete
+            contcar_complete=0
+        else
+            # CONTCAR is incomplete
+            contcar_complete=1
+        fi
+    else
+        # CONTCAR is missing
+        contcar_complete=2
+    fi
+
+    # convergence_status: 0 if converged, else incomplete
+    convergence_status=$((outcar_complete + contcar_complete))
+
+    # Change back to the parent directory
+    cd ..
+}
+
 function setup_simulation_directory {
     # Create segment directory if they don't exist
     seg=$(printf "%0${number_padding}d" $seg)

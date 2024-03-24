@@ -175,8 +175,30 @@ function main {
     # Define the VASP executable
     local EXECUTABLE=vasp_std
 
-    for seg in $(seq 1 $num_segments)
-    do
+    # Check if directories starting with "seg" exist
+    if [ -d "seg"* ]; then
+        echo "Directories starting with 'seg' exist."
+
+        # Find the last segment number
+        last_seg=$(ls -d seg* | sort -n | tail -n 1 | sed 's/seg//')
+        for last_seg in $(seq $last_seg -1 1)
+        do
+            convergence_status=$(check_convergence_of_last_segment)
+            if convergence_status; then
+                # Directories starting with 'seg' exist and are complete
+                break
+            else
+                # Directories starting with 'seg' exist but are incomplete
+                rm -rf "seg"$last_seg
+            fi
+    else
+        # Directories starting with 'seg' do not exist
+        last_seg=0
+    fi
+
+    start_segment_number=$((last_seg + 1))
+    for seg in $(seq $start_segment_number $num_segments)
+    do        
         setup_simulation_directory
 
         # Run the VASP job
@@ -205,14 +227,14 @@ function main {
 #                 USER VARIABLES                   #
 ####################################################
 
-number_padding=2
-
 # define a list of files
 duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"
 removefiles="WAVECAR"
 
-# Set the compute_bader_charges parameter (0 or 1)
+# Other definitions
 compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
+IS_MD_CALC=1  # Set this to 1 for MD calculations
+number_padding=2  # number padding for segment directories
 
 # --- Execute Main Logic ---
 main

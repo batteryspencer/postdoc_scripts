@@ -43,6 +43,32 @@ function log_job_details {
     NIONS=$(sed -n '7p' POSCAR | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum}')
 }
 
+function setup_simulation_directory {
+    # Create segment directory if they don't exist
+    seg=$(printf "%02d" $seg)
+    mkdir -p "seg"$seg
+
+    # Change to the segment directory
+    cd "seg"$seg
+
+    # Check if the symbolic link already exists
+    if [ ! -L "$target_path" ]; then
+        # Create the symbolic link
+        ln -s "$source_path" "$target_path"
+    fi
+
+    # Copy files to the segment directory
+    if [ $seg -eq 1 ]; then
+        cp ../{INCAR,ICONST,KPOINTS,POSCAR,POTCAR} .
+    else
+        cp ../seg$(printf "%02d" $((seg - 1)))/CONTCAR POSCAR
+        cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
+    fi
+
+    # Start timing
+    start_time=$(date +%s)
+}
+
 function log_execution_time {
     # End timing
     end_time=$(date +%s)
@@ -55,6 +81,20 @@ function log_execution_time {
 
     # Print the execution time
     echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)" >> job.out
+}
+
+function post_process {
+
+    # Log the execution time
+    log_execution_time
+
+    # Remove the files from the current directory
+    for file in $removefiles; do
+        rm -f $file
+    done
+
+    # Change back to the parent directory
+    cd ..
 }
 
 function main {
@@ -75,42 +115,12 @@ function main {
 
     for seg in $(seq 1 $num_segments)
     do
-        # Create segment directory if they don't exist
-        seg=$(printf "%02d" $seg)
-        mkdir -p "seg"$seg
-
-        # Change to the segment directory
-        cd "seg"$seg
-
-        # Check if the symbolic link already exists
-        if [ ! -L "$target_path" ]; then
-            # Create the symbolic link
-            ln -s "$source_path" "$target_path"
-        fi
-
-        # Copy files to the segment directory
-        if [ $seg -eq 1 ]; then
-            cp ../{INCAR,ICONST,KPOINTS,POSCAR,POTCAR} .
-        else
-            cp ../seg$(printf "%02d" $((seg - 1)))/CONTCAR POSCAR
-            cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
-        fi
-
-        # Start timing
-        start_time=$(date +%s)
+        setup_simulation_directory
 
         # Run the VASP job
         srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE > job.out 2> job.err
 
-        log_execution_time
-
-        # Remove the files from the current directory
-        for file in $removefiles; do
-            rm -f $file
-        done
-
-        # Change back to the parent directory
-        cd ..
+        post_process
     done
 
     # Remove duplicate files
@@ -120,8 +130,11 @@ function main {
 
 }
 
-# define a list of files to be backed up
-# movefiles="OUTCAR vasprun.xml job.out job.err XDATCAR OSZICAR REPORT EIGENVAL IBZKPT PCDAT CHG CHGCAR DOSCAR"
+####################################################
+#                 USER VARIABLES                   #
+####################################################
+
+# define a list of files
 duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"
 removefiles="WAVECAR"
 

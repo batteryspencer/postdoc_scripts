@@ -67,7 +67,8 @@ function check_contcar_completeness {
 # Check if OUTCAR and CONTCAR are complete
 function check_convergence_of_last_segment {
     # Change to the last segment directory
-    cd "seg"$(printf "%0${number_padding}d" $last_seg)
+    echo "Checking segment $last_seg:"
+    cd "seg"$last_seg
 
     # Check if OUTCAR is complete
     if [ -f "OUTCAR" ]; then
@@ -75,13 +76,16 @@ function check_convergence_of_last_segment {
         if [ "$completed_timesteps" -eq "$segment_size" ]; then
             # OUTCAR is complete
             outcar_complete=0
+            echo "OUTCAR is complete."
         else
             # OUTCAR is incomplete
             outcar_complete=1
+            echo "OUTCAR is incomplete."
         fi
     else
         # OUTCAR is missing
         outcar_complete=2
+        echo "OUTCAR is missing."
     fi
 
     # Check if CONTCAR is complete
@@ -89,13 +93,16 @@ function check_convergence_of_last_segment {
         if check_contcar_completeness; then
             # CONTCAR is complete
             contcar_complete=0
+            echo "CONTCAR is complete."
         else
             # CONTCAR is incomplete
             contcar_complete=1
+            echo "CONTCAR is incomplete."
         fi
     else
         # CONTCAR is missing
         contcar_complete=2
+        echo "CONTCAR is missing."
     fi
 
     # convergence_status: 0 if converged, else incomplete
@@ -176,20 +183,41 @@ function main {
     local EXECUTABLE=vasp_std
 
     # Check if directories starting with "seg" exist
-    if [ -d "seg"* ]; then
+    seg_dir_exists=false
+    for dir in seg*/ ; do
+        if [ -d "$dir" ]; then
+            seg_dir_exists=true
+            break
+        fi
+    done
+
+    if $seg_dir_exists; then
+        echo
         echo "Directories starting with 'seg' exist."
 
         # Find the last segment number
         last_seg=$(ls -d seg* | sort -n | tail -n 1 | sed 's/seg//')
+        echo "Last segment number: $last_seg"
         for last_seg in $(seq $last_seg -1 1)
         do
-            convergence_status=$(check_convergence_of_last_segment)
-            if convergence_status; then
+            last_seg=$(printf "%0${number_padding}d" $last_seg)
+            
+            check_convergence_of_last_segment
+
+            if [ "$convergence_status" -eq 0 ]; then
                 # Directories starting with 'seg' exist and are complete
+                echo "Segment $last_seg is complete."
+                echo
                 break
             else
                 # Directories starting with 'seg' exist but are incomplete
+                echo "Segment $last_seg is incomplete."
                 rm -rf "seg"$last_seg
+                echo "Segment $last_seg has been removed."
+                echo
+                if [ "$last_seg" -eq 1 ]; then
+                    last_seg=$((last_seg - 1))
+                fi
             fi
         done
     else

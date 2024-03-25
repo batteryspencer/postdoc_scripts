@@ -86,10 +86,11 @@ else:
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)
-print(table_string)
+print(table_string + '\n')
 print(results_string)
 with open("pmf_analysis_results.txt", "w") as text_file:
-    text_file.write(table_string)
+    text_file.write(table_string + '\n\n')
+    text_file.write(results_string + '\n')
 
 # Plotting
 plt.figure(figsize=(10, 6))

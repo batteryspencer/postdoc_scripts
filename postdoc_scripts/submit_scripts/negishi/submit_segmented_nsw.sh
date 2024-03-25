@@ -73,7 +73,7 @@ function check_convergence_of_last_segment {
     # Check if OUTCAR is complete
     if [ -f "OUTCAR" ]; then
         completed_timesteps=$(grep -c LOOP+ "OUTCAR")
-        if [ "$completed_timesteps" -eq "$segment_size" ]; then
+        if [ "$completed_timesteps" -eq "$SEGMENT_SIZE" ]; then
             # OUTCAR is complete
             outcar_complete=0
             echo "OUTCAR is complete."
@@ -169,15 +169,11 @@ function post_process {
 function main {
     setup_environment
 
-    # Define the total NSW and the segment size
-    total_nsw=10
-    segment_size=5
-
     # Calculate the number of segments
-    num_segments=$((total_nsw / segment_size))
+    num_segments=$((TOTAL_NSW / SEGMENT_SIZE))
 
     # Modify INCAR file to set NSW to segment size
-    sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$segment_size"'/' INCAR
+    sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
 
     # Define the VASP executable
     local EXECUTABLE=vasp_std
@@ -237,9 +233,9 @@ function main {
     done
 
     # Remove duplicate files
-    for file in $duplicatefiles; do
-        rm -f $file
-    done
+    # for file in $duplicatefiles; do
+    #     rm -f $file
+    # done
 
     # Check if compute_bader_charges is set to 1
     if [ "$compute_bader_charges" -eq 1 ]; then
@@ -256,8 +252,12 @@ function main {
 #                 USER VARIABLES                   #
 ####################################################
 
+# Define the total NSW and the segment size
+TOTAL_NSW=6000
+SEGMENT_SIZE=1000
+
 # define a list of files
-duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"
+# duplicatefiles="POSCAR POTCAR INCAR ICONST KPOINTS"
 removefiles="WAVECAR"
 
 # Other definitions

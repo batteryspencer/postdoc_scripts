@@ -10,33 +10,52 @@ from scipy.integrate import trapz
 def read_force_stats(file_path):
     with open(file_path, 'r') as file:
         lines = file.readlines()
-        if len(lines) > 2:  # Adjusted to account for the MD steps line
-            cv_data = lines[1].split(',')
-            md_steps = int(lines[2].split('=')[1].strip().split()[0])  # Extracts the number of MD steps
-            return float(cv_data[0].strip()), -1*np.around(float(cv_data[1].strip()), 2), float(cv_data[2].strip()), md_steps
-    return None
+        stats = {}
+        cumulative_analysis = []
+        
+        # Parse initial values
+        if len(lines) > 2:
+            stats['CV'] = float(lines[1].split(':')[1].strip())
+            stats['Mean Force'] = -1 * np.around(float(lines[2].split(':')[1].strip()), 2)
+            stats['Standard Deviation'] = float(lines[3].split(':')[1].strip())
+            stats['MD steps'] = int(lines[4].split(':')[1].strip())
+
+            # Parse cumulative analysis results
+            for line in lines[6:]:  # Assuming the Cumulative Analysis starts at line 7
+                parts = line.split()
+                if len(parts) == 3:
+                    interval_data = {
+                        'Interval': int(parts[0]),
+                        'Cumulative Mean': float(parts[1]),
+                        'Cumulative Std': float(parts[2])
+                    }
+                    cumulative_analysis.append(interval_data)
+            
+            stats['Cumulative Analysis'] = cumulative_analysis
+
+        return stats
 
 # This dictionary will hold our data
-data = {'Constrained_Length': [], 'Mean_Force': [], 'Standard_Deviation': [], 'MD_Steps': []}
+data = {'Constrained_Bond_Length': [], 'Mean_Force': [], 'Standard_Deviation': [], 'MD_Steps': []}
 
 # Assuming your directories are named in the '1.06_793' format and are in the current working directory
 for folder in glob.glob("[0-9].[0-9][0-9]_*"):
     file_path = os.path.join(folder, 'force_stats_report.txt')
     if os.path.isfile(file_path):
-        length, force, std_dev, md_steps = read_force_stats(file_path)
-        data['Constrained_Length'].append(length)
-        data['Mean_Force'].append(force)
-        data['Standard_Deviation'].append(std_dev)
-        data['MD_Steps'].append(md_steps)
+        stats = read_force_stats(file_path)
+        data['Constrained_Bond_Length'].append(stats['CV'])
+        data['Mean_Force'].append(stats['Mean Force'])
+        data['Standard_Deviation'].append(stats['Standard Deviation'])
+        data['MD_Steps'].append(stats['MD steps'])
 
 # Create a DataFrame from the data
 df = pd.DataFrame(data)
 
-# Sort the DataFrame based on the constrained length
-df = df.sort_values(by=['Constrained_Length'])
+# Sort the DataFrame based on the constrained bond length
+df = df.sort_values(by=['Constrained_Bond_Length'])
 
-# Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Length'
-x = df['Constrained_Length'].to_numpy()
+# Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length'
+x = df['Constrained_Bond_Length'].to_numpy()
 y = df['Mean_Force'].to_numpy()
 std_dev = df['Standard_Deviation'].to_numpy()
 
@@ -75,10 +94,10 @@ with open("pmf_analysis_results.txt", "w") as text_file:
 # Plotting
 plt.figure(figsize=(10, 6))
 ax = plt.gca()
-plt.errorbar(df['Constrained_Length'], df['Mean_Force'], yerr=df['Standard_Deviation'], fmt='o', color='black', ecolor='black', capthick=2)
+plt.errorbar(df['Constrained_Bond_Length'], df['Mean_Force'], yerr=df['Standard_Deviation'], fmt='o', color='black', ecolor='black', capthick=2)
 
 # Create a polygon to fill the area under the curve
-verts = [(df['Constrained_Length'].iloc[0], 0)] + list(zip(df['Constrained_Length'], df['Mean_Force'])) + [(df['Constrained_Length'].iloc[-1], 0)]
+verts = [(df['Constrained_Bond_Length'].iloc[0], 0)] + list(zip(df['Constrained_Bond_Length'], df['Mean_Force'])) + [(df['Constrained_Bond_Length'].iloc[-1], 0)]
 poly = Polygon(verts, facecolor='0.9', edgecolor='0.1')
 ax.add_patch(poly)
 

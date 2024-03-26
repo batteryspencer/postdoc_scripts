@@ -16,10 +16,9 @@ def calculate_CH_distances(trajectory, C_index, H_index):
 
     return distances
 
-def find_target_frames(trajectory, C_index, H_index, Pt_index, C_H_start, C_H_end, num_images, initial_tolerance=0.01, secondary_tolerance=0.02):
-    C_H_targets = np.linspace(C_H_start, C_H_end, num_images, endpoint=True)
-    target_frames = []
+def find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance):
 
+    target_frames = []
     for target in C_H_targets:
         closest_frame = find_closest_frame(trajectory, C_index, H_index, Pt_index, target, initial_tolerance)
 
@@ -84,7 +83,8 @@ def main():
     trajectory = read("XDATCAR", index=':', format='vasp-xdatcar')
 
     # Find target frames
-    target_frames = find_target_frames(trajectory, C_index, H_index, Pt_index, C_H_start, C_H_end, num_images, initial_tolerance, secondary_tolerance)
+    C_H_targets = np.linspace(C_H_start, C_H_end, num_images, endpoint=True)
+    target_frames = find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance)
 
     # Create directories and write POSCAR
     create_poscar_directories(trajectory, target_frames)

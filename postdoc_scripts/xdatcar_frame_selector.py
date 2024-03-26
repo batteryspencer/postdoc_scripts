@@ -18,6 +18,21 @@ def calculate_CH_distances(trajectory, C_index, H_index):
     """        
     return [frame.get_distance(C_index, H_index, mic=True) for frame in trajectory]
 
+def find_frames_within_range(trajectory, C_index, H_index, target_length, tolerance):
+    """
+    Find frames with C-H bond length within the specified range.
+
+    Parameters:
+    trajectory (list): List of atomic configurations.
+    C_index (int): Index of the carbon atom.
+    H_index (int): Index of the hydrogen atom.
+    target_length (float): Target C-H bond length.
+    tolerance (float): Tolerance for matching C-H bond lengths.
+    """
+    close_frames = [i for i, frame in enumerate(trajectory) 
+                    if abs(frame.get_distance(C_index, H_index, mic=True) - target_length) < tolerance]
+    return close_frames
+
 def find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance):
 
     target_frames = []

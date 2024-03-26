@@ -34,36 +34,34 @@ def find_frames_within_range(trajectory, C_index, H_index, target_length, tolera
     return close_frames
 
 def find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance):
+    """
+    Find frames where the C-H bond length is within the specified range and has minimum C-Pt bond length.
 
+    Parameters:
+    trajectory (list): List of atomic configurations.
+    C_H_targets (list): Target C-H bond lengths to match.
+    C_index (int): Index of the carbon atom.
+    H_index (int): Index of the hydrogen atom.
+    Pt_index (int): Index of the platinum atom.
+    initial_tolerance (float): Initial tolerance for matching C-H bond lengths.
+    secondary_tolerance (float): Secondary tolerance for matching C-H bond lengths.
+    """
     target_frames = []
-    for target in C_H_targets:
-        closest_frame = find_closest_frame(trajectory, C_index, H_index, Pt_index, target, initial_tolerance)
+    for target_length in C_H_targets:
+        frames_within_range = find_frames_within_range(trajectory, C_index, H_index, target_length, initial_tolerance)
 
         # If no frame is found with initial tolerance, try with secondary tolerance
-        if not closest_frame:
-            closest_frame = find_closest_frame(trajectory, C_index, H_index, Pt_index, target, secondary_tolerance)
+        if not frames_within_range:
+            frames_within_range = find_frames_within_range(trajectory, C_index, H_index, target_length, secondary_tolerance)
 
-        if closest_frame:
-            target_frames.append(closest_frame)
-
-    if not target_frames:
-        print("No frames found for the given targets.")
+        if frames_within_range:
+            frame_with_min_C_Pt = frames_within_range[np.argmin([trajectory[i].get_distance(C_index, Pt_index, mic=True) for i in frames_within_range])]
+            CH_distance = trajectory[frame_with_min_C_Pt].get_distance(C_index, H_index, mic=True)
+            target_frames.append((frame_with_min_C_Pt, CH_distance))
+        else:
+            print(f"No frame found for target C-H bond length: {target_length:.2f} Å.")
 
     return target_frames
-
-def find_closest_frame(trajectory, C_index, H_index, Pt_index, target_distance, tolerance):
-    closest_frame = None
-    min_distance = float('inf')
-
-    for frame_index, frame in enumerate(trajectory):
-        C_H_distance = frame.get_distance(C_index, H_index, mic=True)
-        C_Pt_distance = frame.get_distance(C_index, Pt_index, mic=True)
-
-        if abs(C_H_distance - target_distance) <= tolerance and C_Pt_distance < min_distance:
-            closest_frame = (frame_index, C_H_distance)
-            min_distance = C_Pt_distance
-
-    return closest_frame
 
 def create_poscar_directories(trajectory, frame_data, base_dir):
     """

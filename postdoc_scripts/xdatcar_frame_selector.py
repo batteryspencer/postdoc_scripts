@@ -62,9 +62,7 @@ def plot_CH_distances(distances):
 
 def main():
     # Specified inputs
-    C_index = 133  # Index for Carbon
-    H_index = 103  # Index for Hydrogen
-    Pt_index = 24  # Index for Platinum
+    C_index, H_index, Pt_index = 133, 103, 24
     C_H_start = 1.10  # Start distance for C-H
     C_H_end = 1.70  # End distance for C-H
     num_images = 13  # Number of target images
@@ -77,28 +75,17 @@ def main():
         print("No frames found for the given targets.")
         return
 
-    # Creating directories and plotting
-    distances = []
+    # Creating directories
     frame_indices = []
 
     for frame_index, C_H_distance in target_frames:
         dirname = f"{C_H_distance:.2f}_{frame_index}"
         os.makedirs(dirname, exist_ok=True)
         write(f'{dirname}/POSCAR', frames[frame_index], format='vasp')  # Use ASE to write the POSCAR file
-
-        distances.append(C_H_distance)
         frame_indices.append(frame_index)
 
-    # Calculate distances
-    CH_distances = calculate_CH_distances('XDATCAR', C_index, H_index)
-    sorted_distances = sorted(CH_distances, key=lambda x: x[0])  # Sort based on distance
-
-    # Format and print distances with frame index
-    formatted_distances = [f"Distance: {d[0]:.3f} Å, Frame Index: {d[1]}" for d in sorted_distances]
-    #for fd in formatted_distances:
-        #print(fd)
-
     # Plot distances
+    CH_distances = calculate_CH_distances('XDATCAR', C_index, H_index)
     plot_CH_distances(CH_distances)
 
 if __name__ == "__main__":

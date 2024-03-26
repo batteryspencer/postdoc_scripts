@@ -32,6 +32,9 @@ def find_target_frames(xdatcar, C_index, H_index, Pt_index, C_H_start, C_H_end, 
         if closest_frame:
             target_frames.append(closest_frame)
 
+    if not target_frames:
+        print("No frames found for the given targets.")
+
     return target_frames, frames
 
 def find_closest_frame(frames, C_index, H_index, Pt_index, target_distance, tolerance):
@@ -54,7 +57,11 @@ def create_poscar_directories(target_frames, frames):
         os.makedirs(dirname, exist_ok=True)
         write(f'{dirname}/POSCAR', frames[frame_index], format='vasp')  # Use ASE to write the POSCAR file
 
-def plot_CH_distances(distances):
+def plot_CH_distances(XDATCAR_filename, C_index, H_index):
+
+    # Calculate C-H distances
+    distances = calculate_CH_distances(XDATCAR_filename, C_index, H_index)
+
     # Extract distances and frame indices
     dist_values = [dist[0] for dist in distances]
     frame_indices = [dist[1] for dist in distances]
@@ -77,16 +84,11 @@ def main():
 
     target_frames, frames = find_target_frames('XDATCAR', C_index, H_index, Pt_index, C_H_start, C_H_end, num_images, initial_tolerance, secondary_tolerance)
 
-    if not target_frames:
-        print("No frames found for the given targets.")
-        return
-
     # Create directories and write POSCAR
     create_poscar_directories(target_frames, frames)
 
     # Plot distances
-    CH_distances = calculate_CH_distances('XDATCAR', C_index, H_index)
-    plot_CH_distances(CH_distances)
+    plot_CH_distances('XDATCAR', C_index, H_index)
 
 if __name__ == "__main__":
     main()

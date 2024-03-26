@@ -114,7 +114,7 @@ function check_convergence_of_last_segment {
 
 function setup_simulation_directory {
     # Create segment directory if they don't exist
-    seg=$(printf "%0${number_padding}d" $seg)
+    seg=$(printf "%0${number_padding}d" $((10#$seg)))
     mkdir -p "seg"$seg
 
     # Change to the segment directory
@@ -130,7 +130,7 @@ function setup_simulation_directory {
     if [ $seg -eq 1 ]; then
         cp ../{INCAR,ICONST,KPOINTS,POSCAR,POTCAR} .
     else
-        cp ../seg$(printf "%0${number_padding}d" $((seg - 1)))/CONTCAR POSCAR
+        cp ../seg$(printf "%0${number_padding}d" $((10#$seg - 1)))/CONTCAR POSCAR
         cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
     fi
 
@@ -196,7 +196,7 @@ function main {
         echo "Last segment number: $last_seg"
         for last_seg in $(seq $last_seg -1 1)
         do
-            last_seg=$(printf "%0${number_padding}d" $last_seg)
+            last_seg=$(printf "%0${number_padding}d" $((10#$last_seg)))
             
             check_convergence_of_last_segment
 
@@ -212,7 +212,7 @@ function main {
                 echo "Segment $last_seg has been removed."
                 echo
                 if [ "$last_seg" -eq 1 ]; then
-                    last_seg=$((last_seg - 1))
+                    last_seg=$((10#$last_seg - 1))
                 fi
             fi
         done
@@ -221,7 +221,7 @@ function main {
         last_seg=0
     fi
 
-    start_segment_number=$((last_seg + 1))
+    start_segment_number=$((10#$last_seg + 1))
     for seg in $(seq $start_segment_number $num_segments)
     do        
         setup_simulation_directory

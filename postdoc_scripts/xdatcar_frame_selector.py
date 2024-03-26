@@ -119,7 +119,8 @@ def main():
     C_H_end = 1.70  # End distance for C-H
     num_images = 21  # Number of target images
     initial_tolerance = 0.01  # Initial Tolerance level
-    secondary_tolerance = 0.02  # Secondary Tolerance level
+    # Secondary tolerance level to use if no frame is found within the initial tolerance
+    secondary_tolerance = 0.02
 
     # Read trajectory
     trajectory = read("XDATCAR", index=':', format='vasp-xdatcar')

@@ -48,11 +48,20 @@ def find_closest_frame(trajectory, C_index, H_index, Pt_index, target_distance, 
 
     return closest_frame
 
-def create_poscar_directories(trajectory, target_frames):
-    for frame_index, C_H_distance in target_frames:
-        dirname = f"{C_H_distance:.2f}_{frame_index}"
-        os.makedirs(dirname, exist_ok=True)
-        write(f'{dirname}/POSCAR', trajectory[frame_index], format='vasp')  # Use ASE to write the POSCAR file
+def create_poscar_directories(trajectory, frame_data, base_dir):
+    """
+    Create directories and write POSCAR files for specified frames.
+
+    Parameters:
+    trajectory (list): List of atomic configurations.
+    frame_data (list of tuples): Tuples of frame indices and corresponding C-H bond lengths.
+    base_dir (str): Base directory to create frame directories.
+    """
+    for frame_index, bond_length in frame_data:
+        rounded_bond_length = np.round(bond_length, 2)  # Round the bond length to 2 decimal places
+        dir_name = os.path.join(base_dir, f"{rounded_bond_length:.2f}_{frame_index}")
+        os.makedirs(dir_name, exist_ok=True)
+        write(f'{dir_name}/POSCAR', trajectory[frame_index], format='vasp')  # Use ASE to write the POSCAR file
 
 def plot_CH_distances(trajectory, C_index, H_index):
 
@@ -87,7 +96,7 @@ def main():
     target_frames = find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance)
 
     # Create directories and write POSCAR
-    create_poscar_directories(trajectory, target_frames)
+    create_poscar_directories(trajectory, target_frames, os.getcwd())
 
     # Plot distances
     plot_CH_distances(trajectory, C_index, H_index)

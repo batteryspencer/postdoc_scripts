@@ -8,13 +8,15 @@ def compute_distance(coord1, coord2, lattice):
     return np.linalg.norm(diff)
 
 def calculate_CH_distances(trajectory, C_index, H_index):
-    distances = []
+    """
+    Calculate C-H distances across all frames in a trajectory.
 
-    for frame_index, frame in enumerate(trajectory):
-        distance = frame.get_distance(C_index, H_index, mic=True)
-        distances.append((distance, frame_index))  # Append a tuple of distance and frame index
-
-    return distances
+    Parameters:
+    trajectory (list): List of atomic configurations.
+    C_index (int): Index of the carbon atom.
+    H_index (int): Index of the hydrogen atom.
+    """        
+    return [frame.get_distance(C_index, H_index, mic=True) for frame in trajectory]
 
 def find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance):
 
@@ -63,21 +65,39 @@ def create_poscar_directories(trajectory, frame_data, base_dir):
         os.makedirs(dir_name, exist_ok=True)
         write(f'{dir_name}/POSCAR', trajectory[frame_index], format='vasp')  # Use ASE to write the POSCAR file
 
-def plot_CH_distances(trajectory, C_index, H_index):
+def plot_CH_distances(trajectory, C_index, H_index, figname='C-H_distance_plot.png', show_plot=True):
+    """
+    Plot and optionally save the C-H bond distance against the frame index.
 
+    Parameters:
+    trajectory (list): List of atomic configurations.
+    C_index (int): Index of the carbon atom.
+    H_index (int): Index of the hydrogen atom.
+    figname (str): The filename to save the plot.
+    show_plot (bool): If True, display the plot; if False, don't display.
+    """
     # Calculate C-H distances
-    distances = calculate_CH_distances(trajectory, C_index, H_index)
+    CH_distances = calculate_CH_distances(trajectory, C_index, H_index)
 
-    # Extract distances and frame indices
-    dist_values = [dist[0] for dist in distances]
-    frame_indices = [dist[1] for dist in distances]
+    # Extract frame indices
+    frame_indices = np.arange(len(CH_distances))
 
-    plt.plot(frame_indices, dist_values, marker='o', linestyle='-')
-    plt.xlabel('Frame Number')
+    # Plotting
+    plt.plot(frame_indices, CH_distances, marker='o', linestyle='-')
+    plt.xlabel('Frame Index')
     plt.ylabel('C-H Distance (Å)')
-    plt.title('C-H Distance Across Frames in XDATCAR')
+    plt.title('C-H Distance vs Frame Index')
     plt.grid(True)
-    plt.savefig('C-H_distance_plot.png')
+
+    # Saving the plot
+    plt.savefig(figname)
+
+    # Displaying the plot
+    if show_plot:
+        plt.show()
+
+    # Close the plot to free up memory
+    plt.close()
 
 def main():
     # Specified inputs
@@ -99,7 +119,7 @@ def main():
     create_poscar_directories(trajectory, target_frames, os.getcwd())
 
     # Plot distances
-    plot_CH_distances(trajectory, C_index, H_index)
+    plot_CH_distances(trajectory, C_index, H_index, figname='C-H_distance_plot.png', show_plot=False)
 
 if __name__ == "__main__":
     main()

@@ -242,8 +242,7 @@ def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='va
     plt.savefig(filename)
 
 def main():
-    run_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('RUN_')])
-    run_dirs.append('.')  # Include the current directory
+    seg_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('seg')])
 
     total_temperatures = []
     total_energies = []
@@ -253,9 +252,9 @@ def main():
     num_atoms = get_num_atoms_from_outcar('OUTCAR')
     total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
-    for run_dir in run_dirs:
-        outcar_path = os.path.join(run_dir, 'OUTCAR')
-        oszicar_path = os.path.join(run_dir, 'OSZICAR')
+    for seg_dir in seg_dirs:
+        outcar_path = os.path.join(seg_dir, 'OUTCAR')
+        oszicar_path = os.path.join(seg_dir, 'OSZICAR')
 
         temperatures = read_temperatures_from_outcar(outcar_path)
         energies = read_energies_from_oszicar(oszicar_path)

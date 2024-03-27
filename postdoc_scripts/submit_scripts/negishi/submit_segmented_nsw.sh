@@ -117,6 +117,15 @@ function setup_simulation_directory {
     seg=$(printf "%0${number_padding}d" $((10#$seg)))
     mkdir -p "seg"$seg
 
+    # Modify the INCAR file for each segment
+    if [ $((10#$seg)) -eq $num_segments ] && [ $((TOTAL_NSW % SEGMENT_SIZE)) -ne 0 ]; then
+        # For the last segment, if there's a residual, set NSW to the residual
+        sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$((TOTAL_NSW % SEGMENT_SIZE))"'/' INCAR
+    else
+        # For all other segments, set NSW to SEGMENT_SIZE
+        sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
+    fi
+
     # Change to the segment directory
     cd "seg"$seg
 
@@ -171,9 +180,10 @@ function main {
 
     # Calculate the number of segments
     num_segments=$((TOTAL_NSW / SEGMENT_SIZE))
-
-    # Modify INCAR file to set NSW to segment size
-    sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
+    # Check for any residual NSW and add an extra segment if needed
+    if [ $((TOTAL_NSW % SEGMENT_SIZE)) -ne 0 ]; then
+        num_segments=$((num_segments + 1))
+    fi
 
     # Define the VASP executable
     local EXECUTABLE=vasp_std

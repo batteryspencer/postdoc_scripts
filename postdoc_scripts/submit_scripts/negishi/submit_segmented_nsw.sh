@@ -113,6 +113,15 @@ function check_convergence_of_last_segment {
 }
 
 function setup_simulation_directory {
+    if [ $num_segments -eq 1 ]; then
+        # Check if the symbolic link already exists
+        if [ ! -L "$target_path" ]; then
+            # Create the symbolic link
+            ln -s "$source_path" "$target_path"
+        fi
+        return
+    fi
+
     # Create segment directory if they don't exist
     seg=$(printf "%0${number_padding}d" $((10#$seg)))
     mkdir -p "seg"$seg
@@ -236,8 +245,12 @@ function main {
     do        
         setup_simulation_directory
 
-        # Run the VASP job
-        srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE > job.out 2> job.err
+        # Run the VASP job:
+        if [ $num_segments -eq 1 ]; then
+            srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE
+        else
+            srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE > job.out 2> job.err
+        fi
 
         post_process
     done

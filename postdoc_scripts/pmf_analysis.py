@@ -72,7 +72,7 @@ if len(zero_crossings) >= 2:
     start, end = zero_crossings[0], zero_crossings[1]
 
     # Compute the activation barrier (area under the curve) between these two crossings
-    activation_barrier = trapz(y[start:end + 1], x[start:end + 1])
+    activation_barrier = abs(trapz(y[start:end + 1], x[start:end + 1]))
 
     # Calculate the uncertainty in the activation barrier
     segment_widths = np.diff(x[start:end + 1])

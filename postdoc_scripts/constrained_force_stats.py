@@ -59,7 +59,7 @@ def main():
     with open("INCAR", "r") as file:
         time_step = float(next((line.split('=')[1].strip() for line in file if "POTIM" in line), None))
 
-    folders = sorted(glob('RUN_*'), key=lambda x: int(x.split('_')[1])) + ['.']
+    folders = sorted(glob('seg*'))
     
     all_lambda_values = []
     all_cv_values = []

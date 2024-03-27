@@ -40,13 +40,13 @@ function log_job_details {
     echo "Total nodes requested: $NUM_NODE"
     echo "Total CPUs for this jobs: nodes x ppn: $PROC_NUM"
     echo $SLURM_JOB_NODELIST > nodefile.$SLURM_JOB_ID
-    NIONS=$(sed -n '7p' POSCAR | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum}')
 }
 
 function check_contcar_completeness {
     local contcar_header_lines=$(awk '/Cartesian|Direct/{print NR; exit}' CONTCAR)
     local separator_line=1
     local predictor_block_header_lines=3
+    NIONS=$(awk '/Cartesian|Direct/{print sum; exit} {sum=0; for(i=1;i<=NF;i++) sum+=$i}' POSCAR)
     local expected_lines=$((contcar_header_lines + 2 * NIONS + separator_line))
     
     if [ "$IS_MD_CALC" -eq 1 ]; then

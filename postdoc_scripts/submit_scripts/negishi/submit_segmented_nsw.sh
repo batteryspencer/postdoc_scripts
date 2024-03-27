@@ -113,6 +113,9 @@ function check_convergence_of_last_segment {
 }
 
 function setup_simulation_directory {
+    # Start timing
+    start_time=$(date +%s)
+
     if [ $num_segments -eq 1 ]; then
         # Check if the symbolic link already exists
         if [ ! -L "$target_path" ]; then
@@ -151,9 +154,6 @@ function setup_simulation_directory {
         cp ../seg$(printf "%0${number_padding}d" $((10#$seg - 1)))/CONTCAR POSCAR
         cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
     fi
-
-    # Start timing
-    start_time=$(date +%s)
 }
 
 function log_execution_time {
@@ -167,7 +167,11 @@ function log_execution_time {
     seconds=$((execution_time % 60))
 
     # Print the execution time
-    echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)" >> job.out
+    if [ $num_segments -eq 1 ]; then
+        echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)"
+    else
+        echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)" >> job.out
+    fi
 }
 
 function post_process {

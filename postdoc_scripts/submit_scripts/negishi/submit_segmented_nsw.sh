@@ -127,6 +127,10 @@ function setup_simulation_directory {
                 ln -s "$source_path" "$target_path"
             fi
         fi
+
+        # Set NSW to SEGMENT_SIZE
+        sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
+
         return
     fi
 

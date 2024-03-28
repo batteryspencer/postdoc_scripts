@@ -105,8 +105,9 @@ def plot_values(values, target_value, ylabel, title, file_name):
     std_dev = np.std(values)
 
     # Print the mean and standard deviation
-    print(f"Mean {ylabel}: {mean_value:.2f}")
-    print(f"Standard Deviation: {std_dev:.2f}")
+    with open(f'equilibrium_analysis_report.txt', 'a') as file:
+        file.write(f"Mean {ylabel}: {mean_value:.2f}\n")
+        file.write(f"Standard Deviation: {std_dev:.2f}\n")
 
     plt.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")
     if target_value is not None:
@@ -119,12 +120,13 @@ def plot_values(values, target_value, ylabel, title, file_name):
     plt.savefig(file_name)
 
 def print_top_frequencies(frequencies, amplitudes, data_type, top_n):
-    print(f"\n{data_type} - Top {top_n} Frequencies:")
-    print("-------------------------------------------")
-    print("Rank | Frequency (THz) | Amplitude")
-    print("-----|-----------------|-----------")
-    for i in range(top_n):
-        print(f"{i+1:<4} | {frequencies[i]:<15.2f} | {amplitudes[i]:<10.2f}")
+    with open(f'equilibrium_analysis_report.txt', 'a') as file:
+        file.write(f"\n{data_type} - Top {top_n} Frequencies:\n")
+        file.write("-------------------------------------------\n")
+        file.write("Rank | Frequency (THz) | Amplitude\n")
+        file.write("-----|-----------------|-----------\n")
+        for i in range(top_n):
+            file.write(f"{i+1:<4} | {frequencies[i]:<15.2f} | {amplitudes[i]:<10.2f}\n")
 
 def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_type="Data"):
     plt.figure(figsize=(10, 6)) 

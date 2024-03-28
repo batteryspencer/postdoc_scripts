@@ -14,10 +14,6 @@
 #SBATCH --mail-user=pasumarv@purdue.edu
 #SBATCH --mail-type=END
 
-# Define the source and target paths
-source_path="/depot/jgreeley/users/pasumarv/lib/vdw_kernel.bindat"
-target_path="vdw_kernel.bindat"
-
 function setup_environment {
     cd $SLURM_SUBMIT_DIR
     source /etc/profile.d/modules.sh
@@ -27,7 +23,14 @@ function setup_environment {
     module load "jgreeley/vasp/5.4.4_beef"
     export VASP_PP_PATH=/depot/jgreeley/apps/vasp/vasppot/
     conda activate ase_vasp
-    # python generate_input_files.py
+    if [ -f "generate_input_files.py" ]; then
+        export ASE_VASP_VDW=/depot/jgreeley/users/pasumarv/lib/
+        python generate_input_files.py
+    else
+        # Define the source and target paths
+        source_path="/depot/jgreeley/users/pasumarv/lib/vdw_kernel.bindat"
+        target_path="vdw_kernel.bindat"
+    fi
     log_job_details
 }
 
@@ -117,10 +120,12 @@ function setup_simulation_directory {
     start_time=$(date +%s)
 
     if [ $num_segments -eq 1 ]; then
-        # Check if the symbolic link already exists
-        if [ ! -L "$target_path" ]; then
-            # Create the symbolic link
-            ln -s "$source_path" "$target_path"
+        if [ -z "$ASE_VASP_VDW" ]; then
+            # Check if the symbolic link already exists
+            if [ ! -L "$target_path" ]; then
+                # Create the symbolic link
+                ln -s "$source_path" "$target_path"
+            fi
         fi
         return
     fi
@@ -141,10 +146,12 @@ function setup_simulation_directory {
     # Change to the segment directory
     cd "seg"$seg
 
-    # Check if the symbolic link already exists
-    if [ ! -L "$target_path" ]; then
-        # Create the symbolic link
-        ln -s "$source_path" "$target_path"
+    if [ -z "$ASE_VASP_VDW" ]; then
+        # Check if the symbolic link already exists
+        if [ ! -L "$target_path" ]; then
+            # Create the symbolic link
+            ln -s "$source_path" "$target_path"
+        fi
     fi
 
     # Copy files to the segment directory

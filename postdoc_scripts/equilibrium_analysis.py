@@ -249,7 +249,7 @@ def main():
 
     # Assume VDATCAR is in the current directory or a specified path
     vdatcar_path = 'VDATCAR'  # Update this path if VDATCAR is in a different location
-    num_atoms = get_num_atoms_from_outcar('OUTCAR')
+    num_atoms = get_num_atoms_from_outcar(f'{seg_dirs[0]}/OUTCAR')
     total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
     for seg_dir in seg_dirs:

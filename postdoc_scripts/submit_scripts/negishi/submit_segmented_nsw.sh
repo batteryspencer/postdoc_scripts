@@ -202,12 +202,8 @@ function post_process {
 function main {
     setup_environment
 
-    # Calculate the number of segments
-    num_segments=$((TOTAL_NSW / SEGMENT_SIZE))
-    # Check for any residual NSW and add an extra segment if needed
-    if [ $((TOTAL_NSW % SEGMENT_SIZE)) -ne 0 ]; then
-        num_segments=$((num_segments + 1))
-    fi
+    # Calculate the total number of segments, incrementing by 1 if there's a remainder after division
+    num_segments=$((TOTAL_NSW / SEGMENT_SIZE + (TOTAL_NSW % SEGMENT_SIZE > 0 ? 1 : 0)))
 
     # Define the VASP executable
     local EXECUTABLE=vasp_std

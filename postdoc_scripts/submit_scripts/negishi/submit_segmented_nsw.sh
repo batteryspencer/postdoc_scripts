@@ -162,6 +162,48 @@ function setup_simulation_directory {
     fi
 }
 
+function check_segment_completion {
+    # Check if directories starting with "seg" exist
+    seg_dir_exists=false
+    for dir in seg*/ ; do
+        [ -d "$dir" ] && seg_dir_exists=true && break
+    done
+
+    if $seg_dir_exists; then
+        echo
+        echo "Directories starting with 'seg' exist."
+
+        # Find the last segment number
+        last_seg=$(ls -d seg* | sort -n | tail -n 1 | sed 's/seg//')
+        echo "Last segment number: $last_seg"
+        for last_seg in $(seq $last_seg -1 1)
+        do
+            last_seg=$(printf "%0${number_padding}d" $((10#$last_seg)))
+            
+            check_convergence_of_last_segment
+
+            if [ "$convergence_status" -eq 0 ]; then
+                # Directories starting with 'seg' exist and are complete
+                echo "Segment $last_seg is complete."
+                echo
+                break
+            else
+                # Directories starting with 'seg' exist but are incomplete
+                echo "Segment $last_seg is incomplete."
+                rm -rf "seg"$last_seg
+                echo "Segment $last_seg has been removed."
+                echo
+                if [ "$last_seg" -eq 1 ]; then
+                    last_seg=$((10#$last_seg - 1))
+                fi
+            fi
+        done
+    else
+        # Directories starting with 'seg' do not exist
+        last_seg=0
+    fi
+}
+
 function log_execution_time {
     # End timing
     end_time=$(date +%s)
@@ -200,51 +242,7 @@ function main {
     # Calculate the total number of segments, incrementing by 1 if there's a remainder after division
     num_segments=$((TOTAL_NSW / SEGMENT_SIZE + (TOTAL_NSW % SEGMENT_SIZE > 0 ? 1 : 0)))
 
-    # Define the VASP executable
-    local EXECUTABLE=vasp_std
-
-    # Check if directories starting with "seg" exist
-    seg_dir_exists=false
-    for dir in seg*/ ; do
-        if [ -d "$dir" ]; then
-            seg_dir_exists=true
-            break
-        fi
-    done
-
-    if $seg_dir_exists; then
-        echo
-        echo "Directories starting with 'seg' exist."
-
-        # Find the last segment number
-        last_seg=$(ls -d seg* | sort -n | tail -n 1 | sed 's/seg//')
-        echo "Last segment number: $last_seg"
-        for last_seg in $(seq $last_seg -1 1)
-        do
-            last_seg=$(printf "%0${number_padding}d" $((10#$last_seg)))
-            
-            check_convergence_of_last_segment
-
-            if [ "$convergence_status" -eq 0 ]; then
-                # Directories starting with 'seg' exist and are complete
-                echo "Segment $last_seg is complete."
-                echo
-                break
-            else
-                # Directories starting with 'seg' exist but are incomplete
-                echo "Segment $last_seg is incomplete."
-                rm -rf "seg"$last_seg
-                echo "Segment $last_seg has been removed."
-                echo
-                if [ "$last_seg" -eq 1 ]; then
-                    last_seg=$((10#$last_seg - 1))
-                fi
-            fi
-        done
-    else
-        # Directories starting with 'seg' do not exist
-        last_seg=0
-    fi
+    check_segment_completion
 
     start_segment_number=$((10#$last_seg + 1))
     for seg in $(seq $start_segment_number $num_segments)
@@ -269,8 +267,7 @@ function main {
     # Check if compute_bader_charges is set to 1
     if [ "$compute_bader_charges" -eq 1 ]; then
         cd seg$seg
-        echo
-        echo "Evaluating Bader charges:"
+        echo -e "\nEvaluating Bader charges:"
         bader CHGCAR
         cd ..
     fi
@@ -293,6 +290,7 @@ removefiles="WAVECAR"
 compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 IS_MD_CALC=1  # Set this to 1 for MD calculations
 number_padding=2  # number padding for segment directories
+EXECUTABLE=vasp_std  # Define the VASP executable
 
 # --- Execute Main Logic ---
 main

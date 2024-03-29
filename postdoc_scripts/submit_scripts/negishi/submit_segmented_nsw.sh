@@ -118,11 +118,13 @@ function setup_simulation_directory {
     # Start timing
     start_time=$(date +%s)
 
-    if [ $num_segments -eq 1 ] && [ -z "$ASE_VASP_VDW" ]; then
-        # Check if the symbolic link already exists
-        if [ ! -L "$target_path" ]; then
-            # Create the symbolic link
-            ln -s "$source_path" "$target_path"
+    if [ $num_segments -eq 1 ]; then
+        if [ -z "$ASE_VASP_VDW" ]; then
+            # Check if the symbolic link already exists
+            if [ ! -L "$target_path" ]; then
+                # Create the symbolic link
+                ln -s "$source_path" "$target_path"
+            fi
         fi
 
         # Set NSW to SEGMENT_SIZE

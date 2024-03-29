@@ -134,9 +134,6 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_t
     # Convert time step to seconds
     timestep_s = timestep_fs * 1e-15  # Convert fs to s
 
-    # Compute the sampling frequency in Hz (assuming uniform time steps)
-    sampling_frequency_hz = 1 / timestep_s
-    
     # Compute the FFT and corresponding frequencies in Hz
     fft_values = np.fft.fft(values)
     fft_freq_hz = np.fft.fftfreq(len(values), d=timestep_s)
@@ -162,8 +159,6 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_t
 
     # Sort amplitudes and frequencies in descending order based on amplitudes
     sorted_indices = np.argsort(fft_values_nonzero)[::-1]  # Get indices for sorted amplitudes in descending order
-    sorted_amplitudes = fft_values_nonzero[sorted_indices]
-    sorted_frequencies = fft_freq_thz_nonzero[sorted_indices]
 
     # Select the top N frequencies and their amplitudes
     top_indices = sorted_indices[:top_n]
@@ -270,6 +265,9 @@ def main():
     target_temperature = total_temperatures[0]
     target_energy = None
 
+    # Clear the report file
+    with open('equilibrium_analysis_report.txt', 'w') as file:
+        pass
     # Plotting temperature and energy trends
     plot_values(total_temperatures, target_temperature, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
     plot_values(total_energies, target_energy, 'Energy (eV)', 'Energy per Ionic Step Across Simulation', 'energy_trend.png')

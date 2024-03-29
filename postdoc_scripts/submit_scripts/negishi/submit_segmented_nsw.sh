@@ -155,10 +155,10 @@ function setup_simulation_directory {
 
     # Copy files to the segment directory
     if [ $seg -eq 1 ]; then
-        cp ../{INCAR,ICONST,KPOINTS,POSCAR,POTCAR} .
+        cp ../{INCAR,KPOINTS,POSCAR,POTCAR} . && [ $IS_MD_CALC -eq 1 ] && cp ../ICONST .
     else
         cp ../seg$(printf "%0${number_padding}d" $((10#$seg - 1)))/CONTCAR POSCAR
-        cp ../{INCAR,ICONST,KPOINTS,POTCAR} .
+        cp ../{INCAR,KPOINTS,POTCAR} . && [ $IS_MD_CALC -eq 1 ] && cp ../ICONST .
     fi
 }
 

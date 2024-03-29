@@ -26,11 +26,10 @@ function setup_environment {
     if [ -f "generate_input_files.py" ]; then
         export ASE_VASP_VDW=/depot/jgreeley/users/pasumarv/lib/
         python generate_input_files.py
-    else
-        # Define the source and target paths
-        source_path="/depot/jgreeley/users/pasumarv/lib/vdw_kernel.bindat"
-        target_path="vdw_kernel.bindat"
     fi
+    # Define the source and target paths
+    source_path="/depot/jgreeley/users/pasumarv/lib/vdw_kernel.bindat"
+    target_path="vdw_kernel.bindat"
     log_job_details
 }
 
@@ -119,13 +118,11 @@ function setup_simulation_directory {
     # Start timing
     start_time=$(date +%s)
 
-    if [ $num_segments -eq 1 ]; then
-        if [ -z "$ASE_VASP_VDW" ]; then
-            # Check if the symbolic link already exists
-            if [ ! -L "$target_path" ]; then
-                # Create the symbolic link
-                ln -s "$source_path" "$target_path"
-            fi
+    if [ $num_segments -eq 1 ] && [ -z "$ASE_VASP_VDW" ]; then
+        # Check if the symbolic link already exists
+        if [ ! -L "$target_path" ]; then
+            # Create the symbolic link
+            ln -s "$source_path" "$target_path"
         fi
 
         # Set NSW to SEGMENT_SIZE
@@ -150,12 +147,10 @@ function setup_simulation_directory {
     # Change to the segment directory
     cd "seg"$seg
 
-    if [ -z "$ASE_VASP_VDW" ]; then
-        # Check if the symbolic link already exists
-        if [ ! -L "$target_path" ]; then
-            # Create the symbolic link
-            ln -s "$source_path" "$target_path"
-        fi
+    # Check if the symbolic link already exists
+    if [ ! -L "$target_path" ]; then
+        # Create the symbolic link
+        ln -s "$source_path" "$target_path"
     fi
 
     # Copy files to the segment directory

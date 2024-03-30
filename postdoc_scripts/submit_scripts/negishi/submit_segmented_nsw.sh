@@ -107,8 +107,8 @@ function check_convergence_of_last_segment {
         echo "CONTCAR is missing."
     fi
 
-    # convergence_status: 0 if converged, else incomplete
-    convergence_status=$((outcar_complete + contcar_complete))
+    # segment_convergence_status: 0 if converged, else incomplete
+    segment_convergence_status=$((outcar_complete + contcar_complete))
 
     # Change back to the parent directory
     cd ..
@@ -184,7 +184,7 @@ function check_segment_completion {
             
             check_convergence_of_last_segment
 
-            if [ "$convergence_status" -eq 0 ]; then
+            if [ "$segment_convergence_status" -eq 0 ]; then
                 # Directories starting with 'seg' exist and are complete
                 echo "Segment $last_seg is complete."
                 echo
@@ -238,7 +238,7 @@ function post_process {
     if [ $IS_MD_CALC -ne 1 ]; then
         if grep -q "reached required accuracy" OUTCAR; then
             echo -e "\nJob converged"
-            convergence_status=0
+            job_convergence_status=0
         fi
     fi
 
@@ -269,7 +269,7 @@ function main {
         post_process
 
         # Check if the calculation has converged
-        if [ "${convergence_status:-1}" -eq 0 ]; then break; fi
+        if [ "${job_convergence_status:-1}" -eq 0 ]; then break; fi
     done
 
     # Remove duplicate files

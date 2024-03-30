@@ -234,6 +234,14 @@ function post_process {
         rm -f $file
     done
 
+    # Check if the calculation is complete
+    if [ $IS_MD_CALC -ne 1 ]; then
+        if grep -q "reached required accuracy" OUTCAR; then
+            echo -e "\nJob converged"
+            convergence_status=0
+        fi
+    fi
+
     # Change back to the parent directory
     cd ..
 }
@@ -259,6 +267,9 @@ function main {
         fi
 
         post_process
+
+        # Check if the calculation has converged
+        if [ "${convergence_status:-1}" -eq 0 ]; then break; fi
     done
 
     # Remove duplicate files

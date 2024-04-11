@@ -91,7 +91,7 @@ def main():
             output_file.write(f"{interval:>10}{mean:>20.2f}{std:>20.2f}\n")
 
     plt.figure()
-    plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, fmt='o-', label='Cumulative Mean Force')
+    plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, capsize=4, fmt='o-', label='Cumulative Mean Force')
     plt.xlabel('Simulation Interval (Number of Data Points)')
     plt.ylabel('Force (Arbitrary Units)')
     plt.title('Cumulative Analysis of Mean Force Over Simulation Intervals')

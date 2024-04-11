@@ -244,7 +244,18 @@ function post_process {
     done
 
     # Check if the calculation is complete
-    if [ $IS_MD_CALC -ne 1 ]; then
+    if [ $IS_MD_CALC -eq 1 ] && [ $seg -eq $num_segments ]; then
+        completed_timesteps=$(grep -c LOOP+ "OUTCAR")
+        if [ "$completed_timesteps" -eq "$SEGMENT_SIZE" ]; then
+            # OUTCAR is complete
+            outcar_complete=0
+        fi
+
+        if check_contcar_completeness && [ "${outcar_complete:-1}" -eq 0 ]; then
+            echo -e "\nJob converged"
+            job_convergence_status=0
+        fi
+    else
         if grep -q "reached required accuracy" OUTCAR; then
             echo -e "\nJob converged"
             job_convergence_status=0

@@ -139,12 +139,12 @@ function setup_simulation_directory {
 
     # Modify the INCAR file for each segment
     if [ $((10#$seg)) -eq $num_segments ] && [ $((TOTAL_NSW % SEGMENT_SIZE)) -ne 0 ]; then
-        # For the last segment, if there's a residual, set NSW to the residual
-        sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$((TOTAL_NSW % SEGMENT_SIZE))"'/' INCAR
-    else
-        # For all other segments, set NSW to SEGMENT_SIZE
-        sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
+        # For the last segment, if there's a residual, set SEGMENT_SIZE to the residual
+        SEGMENT_SIZE=$((TOTAL_NSW / SEGMENT_SIZE))
     fi
+
+    # For all other segments, set NSW to SEGMENT_SIZE
+    sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
 
     # Change to the segment directory
     cd "seg"$seg

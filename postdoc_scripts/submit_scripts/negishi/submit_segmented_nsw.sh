@@ -210,7 +210,8 @@ function restart_from_checkpoint {
     CURRENT_RESTART_INDEX=${CURRENT_RESTART_INDEX:-0}
     if (( CURRENT_RESTART_INDEX < MAX_RESTARTS )); then
         CURRENT_RESTART_INDEX=$((CURRENT_RESTART_INDEX + 1))
-        sbatch --dependency=afterany:$SLURM_JOB_ID --export=ALL,CURRENT_RESTART_INDEX=$CURRENT_RESTART_INDEX $0
+        dependency_job_id=$(sbatch --dependency=afterany:$SLURM_JOB_ID --export=ALL,CURRENT_RESTART_INDEX=$CURRENT_RESTART_INDEX $0 | awk '{print $NF}')
+        echo -e "\nDependency job ID: $dependency_job_id"
     fi
 }
 
@@ -279,7 +280,11 @@ function main {
         post_process
 
         # Check if the calculation has converged
-        if [ "${job_convergence_status:-1}" -eq 0 ]; then break; fi
+        if [ "${job_convergence_status:-1}" -eq 0 ]; then 
+            # Cancel the dependency job
+            scancel $dependency_job_id
+            break
+        fi
     done
 
     # Remove duplicate files

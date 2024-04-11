@@ -206,6 +206,14 @@ function check_segment_completion {
     fi
 }
 
+function restart_from_checkpoint {
+    CURRENT_RESTART_INDEX=${CURRENT_RESTART_INDEX:-0}
+    if (( CURRENT_RESTART_INDEX < MAX_RESTARTS )); then
+        CURRENT_RESTART_INDEX=$((CURRENT_RESTART_INDEX + 1))
+        sbatch --dependency=afterany:$SLURM_JOB_ID --export=ALL,CURRENT_RESTART_INDEX=$CURRENT_RESTART_INDEX $0
+    fi
+}
+
 function log_execution_time {
     # End timing
     end_time=$(date +%s)
@@ -248,6 +256,8 @@ function post_process {
 
 function main {
     setup_environment
+
+    restart_from_checkpoint
 
     # Calculate the total number of segments, incrementing by 1 if there's a remainder after division
     num_segments=$((TOTAL_NSW / SEGMENT_SIZE + (TOTAL_NSW % SEGMENT_SIZE > 0 ? 1 : 0)))
@@ -304,6 +314,8 @@ compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 IS_MD_CALC=1  # Set this to 1 for MD calculations
 number_padding=2  # number padding for segment directories
 EXECUTABLE=vasp_std  # Define the VASP executable
+MAX_RESTARTS=5  # Set the maximum number of restarts here
 
 # --- Execute Main Logic ---
 main
+

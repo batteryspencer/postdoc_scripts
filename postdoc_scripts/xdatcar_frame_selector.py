@@ -78,28 +78,28 @@ def create_poscar_directories(trajectory, frame_data, base_dir):
         os.makedirs(dir_name, exist_ok=True)
         write(f'{dir_name}/POSCAR', trajectory[frame_index], format='vasp')  # Use ASE to write the POSCAR file
 
-def plot_CH_distances(trajectory, C_index, H_index, figname='C-H_distance_plot.png', show_plot=True):
+def plot_atom_distances(trajectory, atom1_index, atom2_index, figname='atom_distance_plot.png', show_plot=True):
     """
-    Plot and optionally save the C-H bond distance against the frame index.
+    Plot and optionally save the bond distance between two specified atoms against the frame index.
 
     Parameters:
     trajectory (list): List of atomic configurations.
-    C_index (int): Index of the carbon atom.
-    H_index (int): Index of the hydrogen atom.
+    atom1_index (int): Index of the first atom.
+    atom2_index (int): Index of the second atom.
     figname (str): The filename to save the plot.
     show_plot (bool): If True, display the plot; if False, don't display.
     """
     # Calculate C-H distances
-    CH_distances = calculate_atom_distances(trajectory, C_index, H_index)
+    atom_distances = calculate_atom_distances(trajectory, atom1_index, atom2_index)
 
     # Extract frame indices
-    frame_indices = np.arange(len(CH_distances))
+    frame_indices = np.arange(len(atom_distances))
 
     # Plotting
-    plt.plot(frame_indices, CH_distances, marker='o', linestyle='-')
+    plt.plot(frame_indices, atom_distances, marker='o', linestyle='-')
     plt.xlabel('Frame Index')
-    plt.ylabel('C-H Distance (Å)')
-    plt.title('C-H Distance vs Frame Index')
+    plt.ylabel('Distance (Å)')
+    plt.title('Distance between atoms vs Frame Index')
     plt.grid(True)
 
     # Saving the plot
@@ -133,7 +133,7 @@ def main():
     create_poscar_directories(trajectory, target_frames, os.getcwd())
 
     # Plot distances
-    plot_CH_distances(trajectory, C_index, H_index, figname='C-H_distance_plot.png', show_plot=False)
+    plot_atom_distances(trajectory, C_index, H_index, figname='C-H_distance_plot.png', show_plot=False)
 
 if __name__ == "__main__":
     main()

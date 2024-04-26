@@ -7,7 +7,7 @@ from matplotlib.patches import Polygon
 from scipy.integrate import trapz
 
 # This function reads the force_stats_report.txt and extracts the values
-def read_force_stats(file_path):
+def read_force_stats(file_path, target_steps=None):
     with open(file_path, 'r') as file:
         lines = file.readlines()
         stats = {}
@@ -16,9 +16,10 @@ def read_force_stats(file_path):
         # Parse initial values
         if len(lines) > 2:
             stats['CV'] = float(lines[1].split(':')[1].strip())
-            stats['Mean Force'] = -1 * np.around(float(lines[2].split(':')[1].strip()), 2)
-            stats['Standard Deviation'] = float(lines[3].split(':')[1].strip())
-            stats['MD steps'] = int(lines[4].split(':')[1].strip())
+            if target_steps is None:
+                stats['Mean Force'] = -1 * np.around(float(lines[2].split(':')[1].strip()), 2)
+                stats['Standard Deviation'] = float(lines[3].split(':')[1].strip())
+                stats['MD steps'] = int(lines[4].split(':')[1].strip())
 
             # Parse cumulative analysis results
             for line in lines[6:]:  # Assuming the Cumulative Analysis starts at line 7
@@ -30,7 +31,12 @@ def read_force_stats(file_path):
                         'Cumulative Std': float(parts[2])
                     }
                     cumulative_analysis.append(interval_data)
-            
+
+                if len(parts) == 3 and int(parts[0]) == target_steps:
+                    stats['Mean Force'] = -1 * float(parts[1])
+                    stats['Standard Deviation'] = float(parts[2])
+                    stats['MD steps'] = target_steps
+
             stats['Cumulative Analysis'] = cumulative_analysis
 
         return stats
@@ -51,7 +57,7 @@ data = {'Constrained_Bond_Length': [], 'Mean_Force': [], 'Standard_Deviation': [
 for folder in glob.glob("[0-9].[0-9][0-9]_*"):
     file_path = os.path.join(folder, 'force_stats_report.txt')
     if os.path.isfile(file_path):
-        stats = read_force_stats(file_path)
+        stats = read_force_stats(file_path, target_steps=2000)
         data['Constrained_Bond_Length'].append(stats['CV'])
         data['Mean_Force'].append(stats['Mean Force'])
         data['Standard_Deviation'].append(stats['Standard Deviation'])

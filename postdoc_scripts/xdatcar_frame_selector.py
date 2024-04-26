@@ -18,9 +18,9 @@ def calculate_atom_distances(trajectory, atom1_index, atom2_index):
     """        
     return [frame.get_distance(atom1_index, atom2_index, mic=True) for frame in trajectory]
 
-def find_frames_within_range(trajectory, atom1_index, atom2_index, target_length, tolerance):
+def find_frames_within_distance_range(trajectory, atom1_index, atom2_index, target_length, tolerance):
     """
-    Find frames with C-H bond length within the specified range.
+    Find frames with bond length between two specified atoms within the specified range.
 
     Parameters:
     trajectory (list): List of atomic configurations.
@@ -33,33 +33,33 @@ def find_frames_within_range(trajectory, atom1_index, atom2_index, target_length
                     if abs(frame.get_distance(atom1_index, atom2_index, mic=True) - target_length) < tolerance]
     return close_frames
 
-def find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance):
+def find_target_frames(trajectory, target_bond_lengths, atom1_index, atom2_index, atom3_index, initial_tolerance, secondary_tolerance):
     """
-    Find frames where the C-H bond length is within the specified range and has minimum C-Pt bond length.
+    Find frames where the bond length between the first pair of atoms is within the specified range and has minimum bond length with a third atom.
 
     Parameters:
     trajectory (list): List of atomic configurations.
-    C_H_targets (list): Target C-H bond lengths to match.
-    C_index (int): Index of the carbon atom.
-    H_index (int): Index of the hydrogen atom.
-    Pt_index (int): Index of the platinum atom.
-    initial_tolerance (float): Initial tolerance for matching C-H bond lengths.
-    secondary_tolerance (float): Secondary tolerance for matching C-H bond lengths.
+    target_bond_lengths (list): Target bond lengths between the first pair of atoms to match.
+    atom1_index (int): Index of the first atom in the primary bond.
+    atom2_index (int): Index of the second atom in the primary bond.
+    atom3_index (int): Index of the third atom to compare with the first atom.
+    initial_tolerance (float): Initial tolerance for matching the primary bond lengths.
+    secondary_tolerance (float): Secondary tolerance for matching the primary bond lengths.
     """
     target_frames = []
-    for target_length in C_H_targets:
-        frames_within_range = find_frames_within_range(trajectory, C_index, H_index, target_length, initial_tolerance)
+    for target_length in target_bond_lengths:
+        frames_within_range = find_frames_within_distance_range(trajectory, atom1_index, atom2_index, target_length, initial_tolerance)
 
         # If no frame is found with initial tolerance, try with secondary tolerance
         if not frames_within_range:
-            frames_within_range = find_frames_within_range(trajectory, C_index, H_index, target_length, secondary_tolerance)
+            frames_within_range = find_frames_within_distance_range(trajectory, atom1_index, atom2_index, target_length, secondary_tolerance)
 
         if frames_within_range:
-            frame_with_min_C_Pt = frames_within_range[np.argmin([trajectory[i].get_distance(C_index, Pt_index, mic=True) for i in frames_within_range])]
-            CH_distance = trajectory[frame_with_min_C_Pt].get_distance(C_index, H_index, mic=True)
-            target_frames.append((frame_with_min_C_Pt, CH_distance))
+            frame_with_min_bond = frames_within_range[np.argmin([trajectory[i].get_distance(atom1_index, atom3_index, mic=True) for i in frames_within_range])]
+            primary_bond_distance = trajectory[frame_with_min_bond].get_distance(atom1_index, atom2_index, mic=True)
+            target_frames.append((frame_with_min_bond, primary_bond_distance))
         else:
-            print(f"No frame found for target C-H bond length: {target_length:.2f} Å.")
+            print(f"No frame found for target bond length: {target_length:.2f} Å.")
 
     return target_frames
 

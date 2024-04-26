@@ -33,7 +33,7 @@ def find_frames_within_distance_range(trajectory, atom1_index, atom2_index, targ
                     if abs(frame.get_distance(atom1_index, atom2_index, mic=True) - target_length) < tolerance]
     return close_frames
 
-def find_target_frames(trajectory, target_bond_lengths, atom1_index, atom2_index, atom3_index, initial_tolerance, secondary_tolerance):
+def find_target_frames_with_third_atom(trajectory, target_bond_lengths, atom1_index, atom2_index, atom3_index, initial_tolerance, secondary_tolerance):
     """
     Find frames where the bond length between the first pair of atoms is within the specified range and has minimum bond length with a third atom.
 
@@ -127,7 +127,7 @@ def main():
 
     # Find target frames
     C_H_targets = np.linspace(C_H_start, C_H_end, num_images, endpoint=True)
-    target_frames = find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance)
+    target_frames = find_target_frames_with_third_atom(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance)
 
     # Create directories and write POSCAR
     create_poscar_directories(trajectory, target_frames, os.getcwd())

@@ -7,30 +7,30 @@ def compute_distance(coord1, coord2, lattice):
     diff = np.dot(lattice, coord1 - coord2)
     return np.linalg.norm(diff)
 
-def calculate_CH_distances(trajectory, C_index, H_index):
+def calculate_atom_distances(trajectory, atom1_index, atom2_index):
     """
-    Calculate C-H distances across all frames in a trajectory.
+    Calculate distances between two specified atoms across all frames in a trajectory.
 
     Parameters:
     trajectory (list): List of atomic configurations.
-    C_index (int): Index of the carbon atom.
-    H_index (int): Index of the hydrogen atom.
+    atom1_index (int): Index of the first atom.
+    atom2_index (int): Index of the second atom.
     """        
-    return [frame.get_distance(C_index, H_index, mic=True) for frame in trajectory]
+    return [frame.get_distance(atom1_index, atom2_index, mic=True) for frame in trajectory]
 
-def find_frames_within_range(trajectory, C_index, H_index, target_length, tolerance):
+def find_frames_within_range(trajectory, atom1_index, atom2_index, target_length, tolerance):
     """
     Find frames with C-H bond length within the specified range.
 
     Parameters:
     trajectory (list): List of atomic configurations.
-    C_index (int): Index of the carbon atom.
-    H_index (int): Index of the hydrogen atom.
-    target_length (float): Target C-H bond length.
-    tolerance (float): Tolerance for matching C-H bond lengths.
+    atom1_index (int): Index of the first atom.
+    atom2_index (int): Index of the second atom.
+    target_distance (float): Target bond length between the two atoms.
+    tolerance (float): Tolerance for matching the bond lengths.
     """
     close_frames = [i for i, frame in enumerate(trajectory) 
-                    if abs(frame.get_distance(C_index, H_index, mic=True) - target_length) < tolerance]
+                    if abs(frame.get_distance(atom1_index, atom2_index, mic=True) - target_length) < tolerance]
     return close_frames
 
 def find_target_frames(trajectory, C_H_targets, C_index, H_index, Pt_index, initial_tolerance, secondary_tolerance):
@@ -90,7 +90,7 @@ def plot_CH_distances(trajectory, C_index, H_index, figname='C-H_distance_plot.p
     show_plot (bool): If True, display the plot; if False, don't display.
     """
     # Calculate C-H distances
-    CH_distances = calculate_CH_distances(trajectory, C_index, H_index)
+    CH_distances = calculate_atom_distances(trajectory, C_index, H_index)
 
     # Extract frame indices
     frame_indices = np.arange(len(CH_distances))

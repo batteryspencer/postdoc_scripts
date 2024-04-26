@@ -11,7 +11,6 @@ def read_force_stats(file_path, target_steps=None):
     with open(file_path, 'r') as file:
         lines = file.readlines()
         stats = {}
-        cumulative_analysis = []
         
         # Parse initial values
         if len(lines) > 2:
@@ -24,20 +23,10 @@ def read_force_stats(file_path, target_steps=None):
             # Parse cumulative analysis results
             for line in lines[6:]:  # Assuming the Cumulative Analysis starts at line 7
                 parts = line.split()
-                if len(parts) == 3:
-                    interval_data = {
-                        'Interval': int(parts[0]),
-                        'Cumulative Mean': float(parts[1]),
-                        'Cumulative Std': float(parts[2])
-                    }
-                    cumulative_analysis.append(interval_data)
-
                 if len(parts) == 3 and int(parts[0]) == target_steps:
                     stats['Mean Force'] = -1 * float(parts[1])
                     stats['Standard Deviation'] = float(parts[2])
                     stats['MD steps'] = target_steps
-
-            stats['Cumulative Analysis'] = cumulative_analysis
 
         return stats
 

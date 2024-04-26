@@ -39,42 +39,45 @@ def calculate_area(x, y):
     return None
 
 
-# This dictionary will hold our data
-data = {'Constrained_Bond_Length': [], 'Mean_Force': [], 'Standard_Deviation': [], 'MD_Steps': []}
+# for target_steps in np.arange(500, 10500, 500):
+for target_steps in [None]:
+    # This dictionary will hold our data
+    data = {'Constrained_Bond_Length': [], 'Mean_Force': [], 'Standard_Deviation': [], 'MD_Steps': []}
 
-# Assuming your directories are named in the '1.06_793' format and are in the current working directory
-for folder in glob.glob("[0-9].[0-9][0-9]_*"):
-    file_path = os.path.join(folder, 'force_stats_report.txt')
-    if os.path.isfile(file_path):
-        stats = read_force_stats(file_path, target_steps=2000)
-        data['Constrained_Bond_Length'].append(stats['CV'])
-        data['Mean_Force'].append(stats['Mean Force'])
-        data['Standard_Deviation'].append(stats['Standard Deviation'])
-        data['MD_Steps'].append(stats['MD steps'])
+    # Assuming your directories are named in the '1.06_793' format and are in the current working directory
+    for folder in glob.glob("[0-9].[0-9][0-9]_*"):
+        file_path = os.path.join(folder, 'force_stats_report.txt')
+        if os.path.isfile(file_path):
+            stats = read_force_stats(file_path, target_steps=target_steps)
+            data['Constrained_Bond_Length'].append(stats['CV'])
+            data['Mean_Force'].append(stats['Mean Force'])
+            data['Standard_Deviation'].append(stats['Standard Deviation'])
+            data['MD_Steps'].append(stats['MD steps'])
 
-# Create a DataFrame from the data
-df = pd.DataFrame(data)
+    # Create a DataFrame from the data
+    df = pd.DataFrame(data)
 
-# Sort the DataFrame based on the constrained bond length
-df = df.sort_values(by=['Constrained_Bond_Length'])
+    # Sort the DataFrame based on the constrained bond length
+    df = df.sort_values(by=['Constrained_Bond_Length'])
 
-# Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length'
-x = df['Constrained_Bond_Length'].to_numpy()
-y = df['Mean_Force'].to_numpy()
-std_dev = df['Standard_Deviation'].to_numpy()
+    # Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length'
+    x = df['Constrained_Bond_Length'].to_numpy()
+    y = df['Mean_Force'].to_numpy()
+    std_dev = df['Standard_Deviation'].to_numpy()
 
-# Calculate the standard areas and the areas with error adjustments
-activation_barrier = calculate_area(x, y)
-area_upper = calculate_area(x, y + std_dev)
-area_lower = calculate_area(x, y - std_dev)
+    # Calculate the standard areas and the areas with error adjustments
+    activation_barrier = calculate_area(x, y)
+    area_upper = calculate_area(x, y + std_dev)
+    area_lower = calculate_area(x, y - std_dev)
 
-# Calculate the uncertainty as half the difference between the upper and lower areas
-if area_upper is not None and area_lower is not None:
-    # Calculate activation barrier error as half the absolute difference between upper and lower area estimates.
-    activation_barrier_error = np.abs(area_upper - area_lower) / 2
-    results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
-else:
-    results_string = "Not enough zero crossings found to compute the area and its error."
+    # Calculate the uncertainty as half the difference between the upper and lower areas
+    if area_upper is not None and area_lower is not None:
+        # Calculate activation barrier error as half the absolute difference between upper and lower area estimates.
+        activation_barrier_error = np.abs(area_upper - area_lower) / 2
+        results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
+    else:
+        results_string = "Not enough zero crossings found to compute the area and its error."
+    # print(target_steps, activation_barrier.round(2), activation_barrier_error.round(2))
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)

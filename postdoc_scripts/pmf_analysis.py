@@ -35,6 +35,15 @@ def read_force_stats(file_path):
 
         return stats
 
+# Calculate areas for the mean, upper, and lower force curves
+def calculate_area(x, y):
+    zero_crossings = np.where(np.diff(np.sign(y)))[0]
+    if len(zero_crossings) >= 2:
+        start, end = zero_crossings[0], zero_crossings[1]
+        return abs(trapz(y[start:end + 1], x[start:end + 1]))
+    return None
+
+
 # This dictionary will hold our data
 data = {'Constrained_Bond_Length': [], 'Mean_Force': [], 'Standard_Deviation': [], 'MD_Steps': []}
 
@@ -59,27 +68,15 @@ x = df['Constrained_Bond_Length'].to_numpy()
 y = df['Mean_Force'].to_numpy()
 std_dev = df['Standard_Deviation'].to_numpy()
 
-# Find zero crossings
-zero_crossings = np.where(np.diff(np.sign(y)))[0]
+# Calculate the standard areas and the areas with error adjustments
+activation_barrier = calculate_area(x, y)
+area_upper = calculate_area(x, y + std_dev)
+area_lower = calculate_area(x, y - std_dev)
 
-# Initialize the variables to store the results
-activation_barrier = None
-activation_barrier_error = None
-
-# Check if there are at least two zero crossings to define bounds
-if len(zero_crossings) >= 2:
-    # Use the first two zero crossings as an example
-    start, end = zero_crossings[0], zero_crossings[1]
-
-    # Compute the activation barrier (area under the curve) between these two crossings
-    activation_barrier = abs(trapz(y[start:end + 1], x[start:end + 1]))
-
-    # Calculate the uncertainty in the activation barrier
-    segment_widths = np.diff(x[start:end + 1])
-    segment_errors = np.round(std_dev[start:end] * segment_widths, 2)
-    activation_barrier_error = np.round(np.sqrt(np.sum(segment_errors ** 2)), 2)
-
-if activation_barrier is not None and activation_barrier_error is not None:
+# Calculate the uncertainty as half the difference between the upper and lower areas
+if area_upper is not None and area_lower is not None:
+    # Calculate activation barrier error as half the absolute difference between upper and lower area estimates.
+    activation_barrier_error = np.abs(area_upper - area_lower) / 2
     results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
 else:
     results_string = "Not enough zero crossings found to compute the area and its error."
@@ -96,6 +93,8 @@ with open("pmf_analysis_results.txt", "w") as text_file:
 plt.figure(figsize=(10, 6))
 ax = plt.gca()
 plt.errorbar(df['Constrained_Bond_Length'], df['Mean_Force'], yerr=df['Standard_Deviation'], fmt='o', color='black', ecolor='black', capthick=2)
+# plt.plot(df['Constrained_Bond_Length'], df['Mean_Force'] + df['Standard_Deviation'], linestyle='--', color='black', alpha=0.5)
+# plt.plot(df['Constrained_Bond_Length'], df['Mean_Force'] - df['Standard_Deviation'], linestyle='--', color='black', alpha=0.5)
 
 # Create a polygon to fill the area under the curve
 verts = [(df['Constrained_Bond_Length'].iloc[0], 0)] + list(zip(df['Constrained_Bond_Length'], df['Mean_Force'])) + [(df['Constrained_Bond_Length'].iloc[-1], 0)]

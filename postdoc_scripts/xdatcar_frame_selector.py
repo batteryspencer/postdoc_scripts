@@ -33,6 +33,35 @@ def find_frames_within_distance_range(trajectory, atom1_index, atom2_index, targ
                     if abs(frame.get_distance(atom1_index, atom2_index, mic=True) - target_length) < tolerance]
     return close_frames
 
+def find_target_frames_between_two_atoms(trajectory, target_bond_lengths, atom1_index, atom2_index, initial_tolerance, secondary_tolerance):
+    """
+    Find frames where the bond length between the pair of atoms is within the specified range.
+
+    Parameters:
+    trajectory (list): List of atomic configurations.
+    target_bond_lengths (list): Target bond lengths between the first pair of atoms to match.
+    atom1_index (int): Index of the first atom.
+    atom2_index (int): Index of the second atom.
+    initial_tolerance (float): Initial tolerance for matching the bond lengths.
+    secondary_tolerance (float): Secondary tolerance for matching the bond lengths.
+    """
+    target_frames = []
+    for target_length in target_bond_lengths:
+        frames_within_range = find_frames_within_distance_range(trajectory, atom1_index, atom2_index, target_length, initial_tolerance)
+
+        # If no frame is found with initial tolerance, try with secondary tolerance
+        if not frames_within_range:
+            frames_within_range = find_frames_within_distance_range(trajectory, atom1_index, atom2_index, target_length, secondary_tolerance)
+
+        if frames_within_range:
+            frame_with_min_bond = frames_within_range[np.argmin([trajectory[i].get_distance(atom1_index, atom2_index, mic=True) for i in frames_within_range])]
+            bond_distance = trajectory[frame_with_min_bond].get_distance(atom1_index, atom2_index, mic=True)
+            target_frames.append((frame_with_min_bond, bond_distance))
+        else:
+            print(f"No frame found for target bond length: {target_length:.2f} Å.")
+
+    return target_frames
+
 def find_target_frames_with_third_atom(trajectory, target_bond_lengths, atom1_index, atom2_index, atom3_index, initial_tolerance, secondary_tolerance):
     """
     Find frames where the bond length between the first pair of atoms is within the specified range and has minimum bond length with a third atom.

@@ -21,14 +21,15 @@ std_dev_threshold = np.std(smoothed_differences) * 0.5  # Using half of the stan
 stabilization_index = np.where(smoothed_differences < std_dev_threshold)[0][0] + window_size  # Adjust for the window size
 
 # Compute the asymptotic value from the stabilization point
-asymptotic_value = np.mean(activation_barriers[stabilization_index:])
+asymptotic_mean_value = np.mean(activation_barriers[stabilization_index:])
+asymptotic_std_dev_value = np.mean(std_dev[stabilization_index:])
 
 # Plotting
 plt.figure(figsize=(10, 6))
 plt.errorbar(md_steps, activation_barriers, yerr=std_dev, fmt='-o', color='black', ecolor='black', capsize=3.5)
-plt.axhline(y=asymptotic_value, color='red', linestyle='--', label=f'Asymptote: {asymptotic_value:.2f}')
+plt.axhline(y=asymptotic_mean_value, color='red', linestyle='--', label=f'Asymptote: {asymptotic_mean_value:.2f}')
 plt.xlabel('MD Steps', fontsize=12)
 plt.ylabel('Activation Barrier (eV)', fontsize=12)
 plt.savefig('md_force_trend.png', dpi=300, bbox_inches='tight')
 
-print(f"\nSimulation reached stabilization at {md_steps[stabilization_index]} steps with an activation barrier of {asymptotic_value:.2f} eV.")
+print(f"\nSimulation reached stabilization at {md_steps[stabilization_index]} steps with an activation barrier of {asymptotic_mean_value:.2f} ± {asymptotic_std_dev_value:.2f} eV.")

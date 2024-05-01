@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import os
 import re
 import numpy as np
+import pandas as pd
 
 # Define the number of steps to analyze
 NUM_STEPS_TO_ANALYZE = 10000
@@ -96,10 +97,19 @@ def compute_vacf(velocities):
     vacf /= (num_atoms * 3)
     return vacf
 
-def plot_values(values, target_value, ylabel, title, file_name):
+def plot_values(values, target_value, window_size, ylabel, title, file_name):
     plt.figure(figsize=(10, 6))
     steps = range(len(values))
-    plt.plot(steps, values, label=ylabel)
+    
+    # Convert values to a Pandas Series to use rolling function
+    values_series = pd.Series(values)
+    rolling_mean = values_series.rolling(window=window_size).mean()  # Adjust the window size as needed
+
+    # Plot the raw data in gray
+    plt.plot(steps, values, label=ylabel, color='gray', alpha=0.5)
+
+    # Plot the rolling mean in black
+    plt.plot(steps, rolling_mean, label='Rolling Mean', color='black', linewidth=2)
 
     mean_value = np.mean(values)
     std_dev = np.std(values)
@@ -109,7 +119,9 @@ def plot_values(values, target_value, ylabel, title, file_name):
         file.write(f"Mean {ylabel}: {mean_value:.2f}\n")
         file.write(f"Standard Deviation: {std_dev:.2f}\n")
 
+    # Highlight the overall mean with a red dashed line
     plt.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")
+    
     if target_value is not None:
         plt.axhline(target_value, color='g', linestyle='dashed', linewidth=1, label=f'Target {ylabel}: {target_value:.2f}')
 
@@ -269,8 +281,9 @@ def main():
     with open('equilibrium_analysis_report.txt', 'w') as file:
         pass
     # Plotting temperature and energy trends
-    plot_values(total_temperatures, target_temperature, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
-    plot_values(total_energies, target_energy, 'Energy (eV)', 'Energy per Ionic Step Across Simulation', 'energy_trend.png')
+    window_size = 100
+    plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
+    plot_values(total_energies, target_energy, window_size, 'Energy (eV)', 'Energy per Ionic Step Across Simulation', 'energy_trend.png')
 
     # Plotting Fourier transform
     timestep_fs = 1.0

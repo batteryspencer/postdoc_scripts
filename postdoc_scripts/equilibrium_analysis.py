@@ -259,6 +259,7 @@ def main():
     # Assume VDATCAR is in the current directory or a specified path
     vdatcar_path = 'VDATCAR'  # Update this path if VDATCAR is in a different location
     num_atoms = get_num_atoms_from_outcar(f'{seg_dirs[0]}/OUTCAR')
+    timestep_fs = float([line.split('=')[-1].strip() for line in open('INCAR') if 'POTIM' in line][0])
     total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
     for seg_dir in seg_dirs:
@@ -286,7 +287,6 @@ def main():
     plot_values(total_energies, target_energy, window_size, 'Energy (eV)', 'Energy per Ionic Step Across Simulation', 'energy_trend.png')
 
     # Plotting Fourier transform
-    timestep_fs = 1.0
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
 
     # Plotting block averages
@@ -300,7 +300,6 @@ def main():
     plot_vacf(vacf, timestep_fs)
 
     # Plotting Fourier transform
-    timestep_fs = 1.0
     plot_fourier_transform(vacf, timestep_fs, 'Amplitude', 'Fourier Transform of Velocity Fluctuations', 'velocity_fourier_transform.png', 'VACF')
 
 if __name__ == "__main__":

@@ -10,6 +10,11 @@ def read_contcar(filename='CONTCAR'):
     atoms = read(filename)
     return atoms
 
+def read_xdatcar(filename='XDATCAR'):
+    # Read the XDATCAR file
+    atoms = read(filename, index=':')
+    return atoms
+
 def planar_density_profile(atoms, excluded_elements, bins=200):
     # Filter out excluded elements
     filtered_atoms = atoms[[atom.symbol not in excluded_elements for atom in atoms]]
@@ -33,6 +38,17 @@ def planar_density_profile(atoms, excluded_elements, bins=200):
     
     return bin_edges[:-1], normalized_density
 
+def time_averaged_planar_density_profile(atoms, excluded_elements, bins=200):
+    for i in range(len(atoms)):
+        if i == 0:
+            z, density = planar_density_profile(atoms[i], excluded_elements, bins)
+            density_sum = density
+        else:
+            _, density = planar_density_profile(atoms[i], excluded_elements, bins)
+            density_sum += density
+    density_avg = density_sum / len(atoms)
+    return z, density_avg
+
 def plot_density_profile(z, density):
     plt.figure(figsize=(6, 4))
     plt.plot(z, density)
@@ -44,8 +60,10 @@ def plot_density_profile(z, density):
     
 def main():
     atoms = read_contcar()
+    # atoms = read_xdatcar()
     excluded_elements=['Pt']
     z, density = planar_density_profile(atoms, excluded_elements)
+    # z, density = time_averaged_planar_density_profile(atoms, excluded_elements, bins=200)
     plot_density_profile(z, density)
 
 if __name__ == '__main__':

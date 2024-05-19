@@ -31,9 +31,9 @@ def check_slab_properties(slab, layers=4, top_elements=2, tolerance=0.5):
     
     return report
 
-def generate_slab(bulk_atoms, facet_miller_indices=(1, 0, 0), start_image_index=0, num_layers=4, num_layers_fixed=2, vacuum_length=10, repeat_units=(2, 2, 1)):
+def generate_slab(bulk_atoms, facet_miller_indices=(1, 0, 0), start_image_index=0, num_layers=4, vacuum_length=10, repeat_units=(2, 2, 1)):
     """Generate a slab based on input parameters."""
-    slab_gen = SlabGenerator(bulk_atoms, facet_miller_indices, num_layers, num_layers_fixed, vacuum_length, standardize_bulk=True)
+    slab_gen = SlabGenerator(bulk_atoms, facet_miller_indices, num_layers, vacuum_length, standardize_bulk=True)
     terminations = slab_gen.get_unique_terminations()
     slabs = [slab_gen.get_slab(iterm=i) for i, _ in enumerate(terminations)]
     
@@ -47,23 +47,20 @@ def generate_slab(bulk_atoms, facet_miller_indices=(1, 0, 0), start_image_index=
         slab_repeated = slabs[start_image_index] * repeat_units
         slab_report = check_slab_properties(slab_repeated, num_layers, top_elements=2, tolerance=0.5)
     
-    return slab_repeated, slab_report
+    return slab_repeated
 
 def main():
     """Main function to read bulk atoms, generate slab, and write output."""
     bulk_atoms = read('bulk.json')
     facet_miller_indices = (1, 1, 1)
     repeat_units = (3, 3, 1)
-    num_layers = 10
-    num_layers_fixed = None
+    num_layers = 8
     vacuum_length = 10
     start_image_index = 0
     
-    slab, slab_report = generate_slab(bulk_atoms, facet_miller_indices, start_image_index, num_layers, num_layers_fixed, vacuum_length, repeat_units)
+    slab = generate_slab(bulk_atoms, facet_miller_indices, start_image_index, num_layers, vacuum_length, repeat_units)
     
     slab.center(vacuum=vacuum_length, axis=2)
-    constraints = FixAtoms(indices=[atom.index for atom in slab if atom.index < len(slab) - 1])
-    slab.set_constraint(constraints)
     
     traj = Trajectory('restart.json', 'w')
     traj.write(slab)

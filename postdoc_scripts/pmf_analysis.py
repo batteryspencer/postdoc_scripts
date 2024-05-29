@@ -107,7 +107,7 @@ with open("pmf_analysis_results.txt", "w") as text_file:
 # Plotting
 plt.figure(figsize=(10, 6))
 ax = plt.gca()
-plt.errorbar(df['Constrained_Bond_Length'], df['Mean_Force'], yerr=df['Standard_Deviation'], fmt='o', color='black', ecolor='black', capthick=2)
+plt.errorbar(df['Constrained_Bond_Length'], df['Mean_Force'], yerr=df['Standard_Deviation'], fmt='o', color='black', ecolor='black', capsize=3.5)
 # plt.plot(df['Constrained_Bond_Length'], df['Mean_Force'] + df['Standard_Deviation'], linestyle='--', color='black', alpha=0.5)
 # plt.plot(df['Constrained_Bond_Length'], df['Mean_Force'] - df['Standard_Deviation'], linestyle='--', color='black', alpha=0.5)
 

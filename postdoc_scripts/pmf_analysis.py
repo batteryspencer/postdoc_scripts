@@ -6,6 +6,14 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from scipy.integrate import trapz
 
+# Define font sizes and tick parameters as constants
+LABEL_FONTSIZE = 18
+TITLE_FONTSIZE = 22
+TICK_LABELSIZE = 14
+LEGEND_FONTSIZE = 14
+TICK_LENGTH_MAJOR = 8
+TICK_WIDTH_MAJOR = 1
+
 # This function reads the force_stats_report.txt and extracts the values
 def read_force_stats(file_path, target_steps=None):
     with open(file_path, 'r') as file:
@@ -116,7 +124,8 @@ verts = [(df['Constrained_Bond_Length'].iloc[0], 0)] + list(zip(df['Constrained_
 poly = Polygon(verts, facecolor='0.9', edgecolor='0.1')
 ax.add_patch(poly)
 
-plt.title('Mean Force vs. Constrained Bond Length')
-plt.xlabel('Constrained Bond Length (Å)', fontsize=12)
-plt.ylabel('Mean Force (eV/Å)', fontsize=12)
+plt.title('Mean Force vs. Constrained Bond Length', fontsize=TITLE_FONTSIZE)
+plt.xlabel('Constrained Bond Length (Å)', fontsize=LABEL_FONTSIZE)
+plt.ylabel('Mean Force (eV/Å)', fontsize=LABEL_FONTSIZE)
+plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 plt.savefig('mean_force_plot.png', dpi=300, bbox_inches='tight')

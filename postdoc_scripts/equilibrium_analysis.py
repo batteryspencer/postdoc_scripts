@@ -7,6 +7,14 @@ import pandas as pd
 # Define the number of steps to analyze
 NUM_STEPS_TO_ANALYZE = 10000
 
+# Define font sizes and tick parameters as constants
+LABEL_FONTSIZE = 18
+TITLE_FONTSIZE = 22
+TICK_LABELSIZE = 14
+LEGEND_FONTSIZE = 14
+TICK_LENGTH_MAJOR = 8
+TICK_WIDTH_MAJOR = 1
+
 def read_energies_from_oszicar(file_path):
     energies = []
     try:
@@ -125,10 +133,11 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     if target_value is not None:
         plt.axhline(target_value, color='g', linestyle='dashed', linewidth=1, label=f'Target {ylabel}: {target_value:.2f}')
 
-    plt.xlabel('Ionic Step')
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.legend()
+    plt.xlabel('Ionic Step', fontsize=LABEL_FONTSIZE)
+    plt.ylabel(ylabel, fontsize=LABEL_FONTSIZE)
+    plt.title(title, fontsize=TITLE_FONTSIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(file_name)
 
 def print_top_frequencies(frequencies, amplitudes, data_type, top_n):
@@ -232,10 +241,11 @@ def plot_autocorrelation(values, ylabel):
     plt.plot(steps, acf, label='Autocorrelation')
     plt.axhline(0.0, color='r', linestyle='dashed', linewidth=1)
 
-    plt.xlabel('Lag')
-    plt.ylabel('Autocorrelation')
-    plt.title(f'{ylabel} Autocorrelation Function')
-    plt.legend()
+    plt.xlabel('Lag', fontsize=LABEL_FONTSIZE)
+    plt.ylabel('Autocorrelation', fontsize=LABEL_FONTSIZE)
+    plt.title(f'{ylabel} Autocorrelation Function', fontsize=TITLE_FONTSIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(f'{ylabel.lower()}_autocorrelation.png')
 
 def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='vacf.png'):

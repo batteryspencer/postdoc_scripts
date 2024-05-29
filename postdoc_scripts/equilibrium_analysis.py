@@ -267,16 +267,13 @@ def main():
     # Find all directories that start with 'seg' and are present in the current directory
     seg_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('seg')])
 
-    # Prepend the current directory to the sorted list
-    seg_dirs.insert(0, current_directory)
-
     total_temperatures = []
     total_energies = []
 
     # Assume VDATCAR is in the current directory or a specified path
     vdatcar_path = 'VDATCAR'  # Update this path if VDATCAR is in a different location
     num_atoms = get_num_atoms_from_outcar(f'{seg_dirs[0]}/OUTCAR')
-    timestep_fs = float([line.split('=')[-1].strip() for line in open('INCAR') if 'POTIM' in line][0])
+    timestep_fs = float([line.split('=')[-1].strip() for line in open(f'{seg_dirs[0]}/INCAR') if 'POTIM' in line][0])
     total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
     for seg_dir in seg_dirs:

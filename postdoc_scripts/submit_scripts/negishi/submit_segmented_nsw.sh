@@ -23,8 +23,9 @@ function setup_environment {
     module load "jgreeley/vasp/5.4.4_beef"
     export VASP_PP_PATH=/depot/jgreeley/apps/vasp/vasppot/
     conda activate ase_vasp
-    if [ -f "generate_input_files.py" ]; then
+    if [ -f "generate_input_files.py" ] && [ ! -f "POSCAR" ] && [ ! -f "POTCAR" ] && [ ! -f "KPOINTS" ] && [ ! -f "INCAR" ]; then
         export ASE_VASP_VDW=/depot/jgreeley/users/pasumarv/lib/
+        echo "Generating input files..."
         python generate_input_files.py
     fi
     # Define the source and target paths
@@ -210,8 +211,15 @@ function restart_from_checkpoint {
     CURRENT_RESTART_INDEX=${CURRENT_RESTART_INDEX:-0}
     if (( CURRENT_RESTART_INDEX < MAX_RESTARTS )); then
         CURRENT_RESTART_INDEX=$((CURRENT_RESTART_INDEX + 1))
-        dependency_job_id=$(sbatch --dependency=afterany:$SLURM_JOB_ID --export=ALL,CURRENT_RESTART_INDEX=$CURRENT_RESTART_INDEX $0 | awk '{print $NF}')
+        dependency_job_id=$(sbatch --dependency=afterany:$SLURM_JOB_ID --export=ALL,CURRENT_RESTART_INDEX=$CURRENT_RESTART_INDEX,SLURM_OLD_JOB_ID=$SLURM_JOB_ID $0 | awk '{print $NF}')
         echo -e "\nDependency job ID: $dependency_job_id"
+    fi
+
+    if [ -n "$SLURM_OLD_JOB_ID" ]; then
+        if grep -q "ZBRENT: fatal error: bracketing interval incorrect" job_${SLURM_OLD_JOB_ID}.out; then
+            echo -e "\nCopying CONTCAR to POSCAR"
+            cp CONTCAR POSCAR
+        fi
     fi
 }
 
@@ -262,8 +270,10 @@ function post_process {
         fi
     fi
 
-    # Change back to the parent directory
-    cd ..
+    if [ $num_segments -ne 1 ]; then
+        # Change back to the parent directory
+        cd ..
+    fi
 }
 
 function main {

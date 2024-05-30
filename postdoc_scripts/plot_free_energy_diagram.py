@@ -1,6 +1,15 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import sympy as sp
+
+# Define font sizes and tick parameters as constants
+LABEL_FONTSIZE = 18
+TITLE_FONTSIZE = 20
+TICK_LABELSIZE = 14
+LEGEND_FONTSIZE = 14
+TICK_LENGTH_MAJOR = 8
+TICK_WIDTH_MAJOR = 1
 
 def find_coefficients(x1, y1, x2, y2, ymax):
     # Define the variables
@@ -43,7 +52,8 @@ states = {
 barriers = {
     ("propane*", "1-propyl*"): 0.96,
     ("propane*", "2-propyl*"): 0.83,
-    ("1-propyl*", "propylene*"): 0.61
+    ("1-propyl*", "propylene*"): 0.67,
+    ("2-propyl*", "propylene*"): 0.70
 }
 
 # Normalize energies to propane* energy
@@ -79,7 +89,9 @@ transitions = [
     ("2-propyl*", "propylene*")
 ]
 
-for start, end in transitions:
+colors = ['red', 'blue', 'red', 'blue']
+
+for i, (start, end) in enumerate(transitions):
     start_pos = positions[start]
     end_pos = positions[end]
     start_energy = states[start]
@@ -100,18 +112,28 @@ for start, end in transitions:
         y = a * x**2 + b * x + c
 
         ax.plot(x, y, 'gray', linestyle='--')
-        ax.scatter([barrier_pos], [barrier_energy], color='red')
-        ax.text(barrier_pos, barrier_energy, f'  Barrier ({barrier_energy - start_energy:.2f} eV)', verticalalignment='bottom', color='red')
+        ax.scatter([barrier_pos], [barrier_energy], color=colors[i])
+        
+        # Apply offset and adjust text position for second dehydrogenation
+        if (start, end) == ("2-propyl*", "propylene*"):
+            ax.text(barrier_pos + 0.1, barrier_energy - 0.05, f'Barrier ({barrier_energy - start_energy:.2f} eV)', verticalalignment='top', horizontalalignment='left', color=colors[i])
+        else:
+            ax.text(barrier_pos, barrier_energy, f'  Barrier ({barrier_energy - start_energy:.2f} eV)', verticalalignment='bottom', color=colors[i])
     else:
         # Plot a straight line if no barrier is provided
         ax.plot([start_pos + width, end_pos - width], [start_energy, end_energy], 'gray', linestyle='--')
 
+# Set the y-axis ticks every 0.5
+ax.yaxis.set_major_locator(ticker.MultipleLocator(0.5))
+
 # Set labels and title
-ax.set_xlabel('Reaction Coordinate')
-ax.set_ylabel('Free Energy (eV)')
-ax.set_title('Free Energy Diagram for Propane to Propylene Conversion')
+ax.set_xlabel('Reaction Coordinate', fontsize=LABEL_FONTSIZE)
+ax.set_ylabel('Free Energy (eV)', fontsize=LABEL_FONTSIZE)
+ax.set_title('Propane to Propylene Conversion', fontsize=TITLE_FONTSIZE)
+plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 ax.set_xticks([])
 ax.set_xlim(-0.5, 2.5)
 
 plt.tight_layout()
 plt.savefig('free_energy_diagram.png', dpi=300)
+

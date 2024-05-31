@@ -189,10 +189,11 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_t
     # Print the top frequencies for temperature fluctuations
     print_top_frequencies(top_frequencies, top_amplitudes, data_type, top_n)
 
-    plt.xlabel('Frequency (THz)')
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.legend()
+    plt.xlabel('Frequency (THz)', fontsize=LABEL_FONTSIZE)
+    plt.ylabel(ylabel, fontsize=LABEL_FONTSIZE)
+    plt.title(title, fontsize=TITLE_FONTSIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(file_name)
 
 def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=None, x_label='Block Number', y_label='Value', title='Block Averages and Std Dev', filename='block_averages_std_dev.png'):
@@ -227,11 +228,12 @@ def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=Non
     if target_value is not None:
         plt.axhline(target_value, color='g', linestyle='dashed', linewidth=1, label=f'Target {y_label}: {target_value:.2f}')
 
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.title(title)
+    plt.xlabel(x_label, fontsize=LABEL_FONTSIZE)
+    plt.ylabel(y_label, fontsize=LABEL_FONTSIZE)
+    plt.title(title, fontsize=TITLE_FONTSIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.ylim(y_min, y_max)  # Set the y-axis limits
-    plt.legend()
+    plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(filename)
 
 def plot_autocorrelation(values, ylabel):
@@ -254,10 +256,11 @@ def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='va
     plt.plot(time, vacf, label=ylabel)
     plt.axhline(0.0, color='r', linestyle='dashed', linewidth=1)
 
-    plt.xlabel('Time (fs)')
-    plt.ylabel(ylabel)
-    plt.title(f'{ylabel} Function')
-    plt.legend()
+    plt.xlabel('Time (fs)', fontsize=LABEL_FONTSIZE)
+    plt.ylabel(ylabel, fontsize=LABEL_FONTSIZE)
+    plt.title(f'{ylabel} Function', fontsize=TITLE_FONTSIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(filename)
 
 def main():

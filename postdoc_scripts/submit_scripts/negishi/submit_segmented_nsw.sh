@@ -281,8 +281,8 @@ function main {
 
     restart_from_checkpoint
 
-    # Calculate the total number of segments, incrementing by 1 if there's a remainder after division
-    num_segments=$((TOTAL_NSW / SEGMENT_SIZE + (TOTAL_NSW % SEGMENT_SIZE > 0 ? 1 : 0)))
+    # Calculate the total number of segments. If SEGMENT_SIZE is 0, set num_segments to 1. Otherwise, increment by 1 if there's a remainder after division.
+    num_segments=$((SEGMENT_SIZE == 0 ? 1 : (TOTAL_NSW / SEGMENT_SIZE + (TOTAL_NSW % SEGMENT_SIZE > 0 ? 1 : 0))))
 
     check_segment_completion
 
@@ -327,8 +327,9 @@ function main {
 #                 USER VARIABLES                   #
 ####################################################
 
-# Define the total NSW and the segment size
+# Define the total NSW
 TOTAL_NSW=6000
+# Set SEGMENT_SIZE to 0 for single-point calculations.
 SEGMENT_SIZE=1000
 
 # define a list of files

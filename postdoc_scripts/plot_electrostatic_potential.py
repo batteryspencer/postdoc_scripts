@@ -24,8 +24,19 @@ vaspkit_work_function = 5.789  # eV, directly from VASPkit
 calculated_work_function = vacuum_level - fermi_level
 
 # Print the work functions
-print(f'Manually Calculated Work Function: {calculated_work_function:.3f} eV')
+print(f'\nManually Calculated Work Function: {calculated_work_function:.3f} eV')
 print(f'VASPkit Work Function: {vaspkit_work_function:.3f} eV')
+
+# Standard Hydrogen Electrode (SHE) potential relative to vacuum level
+she_potential = 4.44  # eV
+
+# Calculate the potential relative to SHE
+calculated_she_potential = calculated_work_function - she_potential
+vaspkit_she_potential = vaspkit_work_function - she_potential
+
+# Print the SHE potentials
+print(f'\nSHE Potential from Manually Calculated Work Function: {calculated_she_potential:.3f} eV')
+print(f'SHE Potential from VASPkit Work Function: {vaspkit_she_potential:.3f} eV')
 
 # Plot the electrostatic potential profile
 plt.figure(figsize=(10, 6))

@@ -17,8 +17,8 @@ data = pd.read_csv(file_name, delim_whitespace=True, skiprows=1, header=None, na
 
 # Define the vacuum and Fermi levels from their respective sources
 vacuum_level = 4.847  # eV, from VASPkit
-fermi_level = -0.9412  # eV, from OUTCAR
 vaspkit_work_function = 5.789  # eV, directly from VASPkit
+fermi_level = -0.9412  # eV, from OUTCAR
 
 # Calculate the manually computed work function
 calculated_work_function = vacuum_level - fermi_level

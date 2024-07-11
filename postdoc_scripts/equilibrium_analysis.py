@@ -286,11 +286,12 @@ def main():
         outcar_path = os.path.join(seg_dir, 'OUTCAR')
         oszicar_path = os.path.join(seg_dir, 'OSZICAR')
 
-        temperatures = read_temperatures_from_outcar(outcar_path)
-        energies = read_energies_from_oszicar(oszicar_path)
+        if os.path.exists(outcar_path):
+            temperatures = read_temperatures_from_outcar(outcar_path)
+            energies = read_energies_from_oszicar(oszicar_path)
 
-        total_temperatures.extend(temperatures)
-        total_energies.extend(energies)
+            total_temperatures.extend(temperatures)
+            total_energies.extend(energies)
 
     # Truncate the data to the number of steps we want to analyze
     total_temperatures = total_temperatures[:NUM_STEPS_TO_ANALYZE]

@@ -270,6 +270,9 @@ def main():
     # Find all directories that start with 'seg' and are present in the current directory
     seg_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('seg')])
 
+    # Prepend the current directory to the sorted list
+    seg_dirs.insert(0, current_directory)
+
     total_temperatures = []
     total_energies = []
 

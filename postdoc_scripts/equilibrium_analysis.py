@@ -34,6 +34,25 @@ def read_energies_from_oszicar(file_path):
         print(f"File not found: {file_path}")
     return energies
 
+def extract_total_energies(file_path):
+    total_energies = []
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            if 'free  energy' in line:
+                dft_energy = float(re.search(r'[-+]?\d*\.\d+|\d+', line).group())
+            elif 'kinetic energy EKIN' in line:
+                kinetic_energy = float(re.search(r'[-+]?\d*\.\d+|\d+', line).group())
+
+                # Check if both energies are extracted
+                if dft_energy is not None and kinetic_energy is not None:
+                    total_energy = dft_energy + kinetic_energy
+                    total_energies.append(total_energy)
+                    dft_energy = None  # Reset for the next iteration
+                    kinetic_energy = None  # Reset for the next iteration
+
+    return total_energies
+
 def read_temperatures_from_outcar(file_path):
     temperatures = []
     temp_pattern = re.compile(r"temperature\s+(\d+\.\d+)\s+K")
@@ -264,13 +283,11 @@ def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='va
     plt.savefig(filename)
 
 def main():
-    # Get the current directory
-    current_directory = os.getcwd()
-
     # Find all directories that start with 'seg' and are present in the current directory
     seg_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('seg')])
 
     # Prepend the current directory to the sorted list
+    current_directory = os.getcwd()
     seg_dirs.insert(0, current_directory)
 
     total_temperatures = []
@@ -284,11 +301,10 @@ def main():
 
     for seg_dir in seg_dirs:
         outcar_path = os.path.join(seg_dir, 'OUTCAR')
-        oszicar_path = os.path.join(seg_dir, 'OSZICAR')
 
         if os.path.exists(outcar_path):
             temperatures = read_temperatures_from_outcar(outcar_path)
-            energies = read_energies_from_oszicar(oszicar_path)
+            energies = extract_total_energies(outcar_path)
 
             total_temperatures.extend(temperatures)
             total_energies.extend(energies)
@@ -305,18 +321,18 @@ def main():
     # Plotting temperature and energy trends
     window_size = 100
     plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
-    plot_values(total_energies, target_energy, window_size, 'Energy (eV)', 'Energy per Ionic Step Across Simulation', 'energy_trend.png')
+    plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'energy_trend.png')
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
 
     # Plotting block averages
     compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')
-    compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Energy', filename='energy_block_averages.png')
+    compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='energy_block_averages.png')
 
     # Plotting autocorrelation functions
     plot_autocorrelation(total_temperatures, 'Temperature')
-    plot_autocorrelation(total_energies, 'Energy')
+    plot_autocorrelation(total_energies, 'Total Energy')
     vacf = compute_vacf(total_velocities)
     plot_vacf(vacf, timestep_fs)
 

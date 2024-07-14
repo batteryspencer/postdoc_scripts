@@ -267,7 +267,7 @@ def plot_autocorrelation(values, ylabel):
     plt.title(f'{ylabel} Autocorrelation Function', fontsize=TITLE_FONTSIZE)
     plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.legend(fontsize=LEGEND_FONTSIZE)
-    plt.savefig(f'{ylabel.lower()}_autocorrelation.png')
+    plt.savefig(f'{ylabel.lower().replace(" ", "_")}_autocorrelation.png')
 
 def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='vacf.png'):
     plt.figure(figsize=(10, 6))
@@ -321,14 +321,14 @@ def main():
     # Plotting temperature and energy trends
     window_size = 100
     plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
-    plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'energy_trend.png')
+    plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
 
     # Plotting block averages
     compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')
-    compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='energy_block_averages.png')
+    compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='total_energy_block_averages.png')
 
     # Plotting autocorrelation functions
     plot_autocorrelation(total_temperatures, 'Temperature')

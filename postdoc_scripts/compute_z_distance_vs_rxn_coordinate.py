@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
+import pandas as pd
 
 def read_lattice_vectors(xdatcar_path):
     """Read the lattice vectors from an XDATCAR file."""
@@ -86,14 +87,20 @@ def main():
 
     if results:
         results.sort(key=lambda x: x[0])
-        bond_lengths, means, stds = zip(*results)
+        df = pd.DataFrame(results, columns=['Bond Length (Å)', 'Mean Z-Distance (Å)', 'Standard Deviation (Å)'])
 
-        plt.errorbar(bond_lengths, means, yerr=stds, color='k', fmt='o-', capsize=5, capthick=2)
-        
+        # Format the DataFrame to display two decimal places
+        pd.options.display.float_format = '{:.2f}'.format
+
         # Linear trendline
-        slope, intercept, r_value, p_value, std_err = linregress(bond_lengths[1:], means[1:])
+        x = df['Bond Length (Å)'].to_numpy()
+        y = df['Mean Z-Distance (Å)'].to_numpy()
+        std_dev = df['Standard Deviation (Å)'].to_numpy()
+        slope, intercept, r_value, p_value, std_err = linregress(x[1:], y[1:])
         trendline = np.poly1d([slope, intercept])
-        plt.plot(bond_lengths, trendline(bond_lengths), 'r--')
+        
+        plt.errorbar(x, y, yerr=std_dev, color='k', fmt='o-', capsize=5, capthick=2)
+        plt.plot(x, trendline(x), 'r--')
 
         # Annotate R² value
         r_squared = f'$R^2$ = {r_value**2:.2f}'
@@ -102,6 +109,12 @@ def main():
         plt.xlabel("C-H Bond Length (Å)")
         plt.ylabel("Z-Distance from Surface (Å)")
         plt.savefig("z_distance_vs_CH_bond_length.png", dpi=300)
+
+        # Print and save the DataFrame to a text file
+        table_string = df.to_string(index=False)
+        print(table_string + '\n')
+        with open("z_distance_vs_CH_bond_length.txt", "w") as text_file:
+            text_file.write(table_string + '\n')
     else:
         print("No valid data found. Please check your folders and files.")
 

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import linregress
 
 def read_lattice_vectors(xdatcar_path):
     """Read the lattice vectors from an XDATCAR file."""
@@ -88,6 +89,16 @@ def main():
         bond_lengths, means, stds = zip(*results)
 
         plt.errorbar(bond_lengths, means, yerr=stds, color='k', fmt='o-', capsize=5, capthick=2)
+        
+        # Linear trendline
+        slope, intercept, r_value, p_value, std_err = linregress(bond_lengths[1:], means[1:])
+        trendline = np.poly1d([slope, intercept])
+        plt.plot(bond_lengths, trendline(bond_lengths), 'r--')
+
+        # Annotate R² value
+        r_squared = f'$R^2$ = {r_value**2:.2f}'
+        plt.text(0.80, 0.95, r_squared, transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+
         plt.xlabel("C-H Bond Length (Å)")
         plt.ylabel("Z-Distance from Surface (Å)")
         plt.savefig("z_distance_vs_CH_bond_length.png", dpi=300)

@@ -41,6 +41,7 @@ def read_force_stats(file_path, target_steps=None):
 # Calculate areas for the mean, upper, and lower force curves
 def calculate_area(x, y):
     zero_crossings = np.where(np.diff(np.sign(y)))[0]
+    roots = []
     if len(zero_crossings) < 2:
         # Fit a second order polynomial if not enough zero crossings are found
         coeffs = np.polyfit(x, y, 2)
@@ -54,15 +55,18 @@ def calculate_area(x, y):
             y_integration = p(x_integration)
             idx_start = np.argmin(np.abs(x_integration - zero_crossings[0]))
             idx_end = np.argmin(np.abs(x_integration - zero_crossings[1]))
-            return abs(trapz(y_integration[idx_start:idx_end + 1], x_integration[idx_start:idx_end + 1]))
+            area = abs(trapz(y_integration[idx_start:idx_end + 1], x_integration[idx_start:idx_end + 1]))
+            return area, roots
 
     if len(zero_crossings) >= 2:
         # Use original x and y data for zero crossings found within the data range
         zero_crossings.sort()
         start, end = zero_crossings[0], zero_crossings[1]
-        return abs(trapz(y[start:end + 1], x[start:end + 1]))
+        roots = [x[start], x[end]]
+        area = abs(trapz(y[start:end + 1], x[start:end + 1]))
+        return area, roots
 
-    return None
+    return None, roots
 
 # for target_steps in np.arange(500, 10500, 500):
 for target_steps in [None]:
@@ -91,9 +95,9 @@ for target_steps in [None]:
     std_dev = df['Standard_Deviation'].to_numpy()
 
     # Calculate the standard areas and the areas with error adjustments
-    activation_barrier = calculate_area(x, y)
-    area_upper = calculate_area(x, y + std_dev)
-    area_lower = calculate_area(x, y - std_dev)
+    activation_barrier, roots = calculate_area(x, y)
+    area_upper, _ = calculate_area(x, y + std_dev)
+    area_lower, _ = calculate_area(x, y - std_dev)
 
     # Calculate the uncertainty as half the difference between the upper and lower areas
     if area_upper is not None and area_lower is not None:
@@ -102,7 +106,10 @@ for target_steps in [None]:
         results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
     else:
         results_string = "Not enough zero crossings found to compute the area and its error."
-    # print(target_steps, activation_barrier.round(2), activation_barrier_error.round(2))
+    
+    # Add roots information to the results string
+    if len(roots) >= 2:
+        results_string += f"Equilibrium Bond Distances: Initial State = {roots[0]:.2f} Å, Transition State = {roots[1]:.2f} Å\n"
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)

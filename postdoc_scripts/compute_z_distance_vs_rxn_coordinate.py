@@ -58,10 +58,23 @@ def compute_mean_std(z_distances):
     std_z = np.std(z_distances)
     return mean_z, std_z
 
+def read_equilibrium_bond_distance(pmf_file_path):
+    """Read the equilibrium bond distance for the initial state from pmf_analysis_results.txt."""
+    with open(pmf_file_path, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            if line.strip().startswith("Equilibrium Bond Distances:"):
+                parts = line.split('=')
+                initial_state_distance_str = parts[1].split(',')[0].strip().split(' ')[-2]
+                initial_state_distance = float(initial_state_distance_str)
+                return initial_state_distance
+    return None
+
 def main():
     base_folder = "."  # Current directory
     index1 = 2  # 0-based index for the first atom
     index2 = 116  # 0-based index for the second atom
+    pmf_file_path = "pmf_analysis_results.txt"  # Path to the pmf_analysis_results.txt file
     folders = [f for f in os.listdir(base_folder) if os.path.isdir(f) and any(char.isdigit() for char in f)]
     results = []
 
@@ -116,12 +129,15 @@ def main():
         with open("z_distance_vs_CH_bond_length.txt", "w") as text_file:
             text_file.write(table_string + '\n')
 
-            # Define the equilibrium bond distance for the initial state of 1.05 Å
-            initial_state_equilibrium_bond_distance = 1.05
-            equilibrium_mean_z_distance = trendline(initial_state_equilibrium_bond_distance)
-            text_file.write("\n")
-            text_file.write(f"Equilibrium Bond Distance for the Initial State: {initial_state_equilibrium_bond_distance:.2f} Å\n")
-            text_file.write(f"Distance from Surface the C-H bond is activated: {equilibrium_mean_z_distance:.2f} Å\n")
+            # Read the equilibrium bond distance for the initial state from pmf_analysis_results.txt
+            initial_state_equilibrium_bond_distance = read_equilibrium_bond_distance(pmf_file_path)
+            if initial_state_equilibrium_bond_distance is not None:
+                equilibrium_mean_z_distance = trendline(initial_state_equilibrium_bond_distance)
+                text_file.write("\n")
+                text_file.write(f"Equilibrium Bond Distance for the Initial State: {initial_state_equilibrium_bond_distance:.3f} Å\n")
+                text_file.write(f"Distance from Surface the C-H bond is activated: {equilibrium_mean_z_distance:.3f} Å\n")
+            else:
+                print("Could not find the equilibrium bond distance for the initial state in pmf_analysis_results.txt")
     else:
         print("No valid data found. Please check your folders and files.")
 

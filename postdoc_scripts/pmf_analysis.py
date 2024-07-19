@@ -42,14 +42,17 @@ def read_force_stats(file_path, target_steps=None):
 def calculate_area(x, y):
     zero_crossings = np.where(np.diff(np.sign(y)))[0]
     roots = []
+
+    def interpolate_zero_crossing(x1, y1, x2, y2):
+        return x1 - y1 * (x2 - x1) / (y2 - y1)
+
     if len(zero_crossings) < 2:
-        # Fit a second order polynomial if not enough zero crossings are found
+        # Fit a second-order polynomial if not enough zero crossings are found
         coeffs = np.polyfit(x, y, 2)
         p = np.poly1d(coeffs)
         roots = np.roots(p).real
         roots.sort()
         if len(roots) >= 2:
-            # Use polynomial to determine y-values at extrapolated zero crossings
             zero_crossings = roots[:2]
             x_integration = np.linspace(min(zero_crossings), max(zero_crossings), num=500)
             y_integration = p(x_integration)
@@ -59,11 +62,15 @@ def calculate_area(x, y):
             return area, roots
 
     if len(zero_crossings) >= 2:
-        # Use original x and y data for zero crossings found within the data range
         zero_crossings.sort()
         start, end = zero_crossings[0], zero_crossings[1]
-        roots = [x[start], x[end]]
-        area = abs(trapz(y[start:end + 1], x[start:end + 1]))
+        roots = [
+            interpolate_zero_crossing(x[start], y[start], x[start+1], y[start+1]),
+            interpolate_zero_crossing(x[end], y[end], x[end+1], y[end+1])
+        ]
+        start_idx = np.argmin(np.abs(x - roots[0]))
+        end_idx = np.argmin(np.abs(x - roots[1]))
+        area = abs(trapz(y[start_idx:end_idx + 1], x[start_idx:end_idx + 1]))
         return area, roots
 
     return None, roots

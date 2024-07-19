@@ -115,6 +115,13 @@ def main():
         print(table_string + '\n')
         with open("z_distance_vs_CH_bond_length.txt", "w") as text_file:
             text_file.write(table_string + '\n')
+
+            # Define the equilibrium bond distance for the initial state of 1.05 Å
+            initial_state_equilibrium_bond_distance = 1.05
+            equilibrium_mean_z_distance = trendline(initial_state_equilibrium_bond_distance)
+            text_file.write("\n")
+            text_file.write(f"Equilibrium Bond Distance for the Initial State: {initial_state_equilibrium_bond_distance:.2f} Å\n")
+            text_file.write(f"Distance from Surface the C-H bond is activated: {equilibrium_mean_z_distance:.2f} Å\n")
     else:
         print("No valid data found. Please check your folders and files.")
 

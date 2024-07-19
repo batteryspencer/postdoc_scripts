@@ -71,28 +71,28 @@ def calculate_area(x, y):
 # for target_steps in np.arange(500, 10500, 500):
 for target_steps in [None]:
     # This dictionary will hold our data
-    data = {'Constrained_Bond_Length': [], 'Mean_Force': [], 'Standard_Deviation': [], 'MD_Steps': []}
+    data = {'Constrained_Bond_Length (Å)' : [], 'Mean_Force (eV/Å)' : [], 'Standard_Deviation (eV/Å)' : [], 'MD_Steps': []}
 
     # Assuming your directories are named in the '1.06_793' format and are in the current working directory
     for folder in glob.glob("[0-9].[0-9][0-9]_*"):
         file_path = os.path.join(folder, 'force_stats_report.txt')
         if os.path.isfile(file_path):
             stats = read_force_stats(file_path, target_steps=target_steps)
-            data['Constrained_Bond_Length'].append(stats['CV'])
-            data['Mean_Force'].append(stats['Mean Force'])
-            data['Standard_Deviation'].append(stats['Standard Deviation'])
+            data['Constrained_Bond_Length (Å)' ].append(stats['CV'])
+            data['Mean_Force (eV/Å)' ].append(stats['Mean Force'])
+            data['Standard_Deviation (eV/Å)' ].append(stats['Standard Deviation'])
             data['MD_Steps'].append(stats['MD steps'])
 
     # Create a DataFrame from the data
     df = pd.DataFrame(data)
 
     # Sort the DataFrame based on the constrained bond length
-    df = df.sort_values(by=['Constrained_Bond_Length'])
+    df = df.sort_values(by=['Constrained_Bond_Length (Å)' ])
 
-    # Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length'
-    x = df['Constrained_Bond_Length'].to_numpy()
-    y = df['Mean_Force'].to_numpy()
-    std_dev = df['Standard_Deviation'].to_numpy()
+    # Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length (Å)' 
+    x = df['Constrained_Bond_Length (Å)' ].to_numpy()
+    y = df['Mean_Force (eV/Å)' ].to_numpy()
+    std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
 
     # Calculate the standard areas and the areas with error adjustments
     activation_barrier, roots = calculate_area(x, y)
@@ -122,12 +122,12 @@ with open("pmf_analysis_results.txt", "w") as text_file:
 # Plotting
 plt.figure(figsize=(10, 6))
 ax = plt.gca()
-plt.errorbar(df['Constrained_Bond_Length'], df['Mean_Force'], yerr=df['Standard_Deviation'], fmt='o', color='black', ecolor='black', capsize=3.5)
-# plt.plot(df['Constrained_Bond_Length'], df['Mean_Force'] + df['Standard_Deviation'], linestyle='--', color='black', alpha=0.5)
-# plt.plot(df['Constrained_Bond_Length'], df['Mean_Force'] - df['Standard_Deviation'], linestyle='--', color='black', alpha=0.5)
+plt.errorbar(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ], yerr=df['Standard_Deviation (eV/Å)' ], fmt='o', color='black', ecolor='black', capsize=3.5)
+# plt.plot(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ] + df['Standard_Deviation (eV/Å)' ], linestyle='--', color='black', alpha=0.5)
+# plt.plot(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ] - df['Standard_Deviation (eV/Å)' ], linestyle='--', color='black', alpha=0.5)
 
 # Create a polygon to fill the area under the curve
-verts = [(df['Constrained_Bond_Length'].iloc[0], 0)] + list(zip(df['Constrained_Bond_Length'], df['Mean_Force'])) + [(df['Constrained_Bond_Length'].iloc[-1], 0)]
+verts = [(df['Constrained_Bond_Length (Å)' ].iloc[0], 0)] + list(zip(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ])) + [(df['Constrained_Bond_Length (Å)' ].iloc[-1], 0)]
 poly = Polygon(verts, facecolor='0.9', edgecolor='0.1')
 ax.add_patch(poly)
 

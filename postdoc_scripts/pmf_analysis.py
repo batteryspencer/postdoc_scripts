@@ -116,7 +116,7 @@ for target_steps in [None]:
     
     # Add roots information to the results string
     if len(roots) >= 2:
-        results_string += f"Equilibrium Bond Distances: Initial State = {roots[0]:.2f} Å, Transition State = {roots[1]:.2f} Å\n"
+        results_string += f"Equilibrium Bond Distances: Initial State = {roots[0]:.3f} Å, Transition State = {roots[1]:.3f} Å\n"
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)

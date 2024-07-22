@@ -14,6 +14,26 @@
 #SBATCH --mail-user=pasumarv@purdue.edu
 #SBATCH --mail-type=END
 
+# This SLURM batch script manages VASP job submissions with support for:
+# - Multi-segment molecular dynamics (MD) calculations
+# - Non-MD calculations like geometry relaxation
+#
+# --- Checkpointing and Restarts ---
+# - Supports restarting from checkpoints in case of job failure or timeout.
+#
+# --- Segment Handling ---
+# - Divides the simulation into segments to handle long MD calculations or geometry relaxations.
+# - Sets up and processes each segment, ensuring completeness of output files.
+#
+# --- Convergence Checks ---
+# - Validates the completeness of CONTCAR and OUTCAR files to determine if each segment has converged.
+#
+# --- Self-Termination ---
+# - Automatically terminates the job if there is insufficient remaining time to complete the current segment.
+#
+# --- Post-Processing ---
+# - Supports Bader charge calculations if specified.
+
 function setup_environment {
     cd $SLURM_SUBMIT_DIR
     source /etc/profile.d/modules.sh
@@ -277,7 +297,7 @@ function post_process {
 }
 
 # Function to convert time to seconds
-time_to_seconds() {
+function time_to_seconds {
     local time_str="$1"
     local total_seconds=0
 
@@ -305,12 +325,12 @@ time_to_seconds() {
 }
 
 # Function to get remaining time
-get_remaining_time() {
+function get_remaining_time {
     squeue -j $SLURM_JOB_ID -h -o "%L"
 }
 
 # Check remaining time
-check_time() {
+function check_time {
     prev_runtime=$1
     remaining_time=$(get_remaining_time)
     remaining_seconds=$(time_to_seconds "$remaining_time")

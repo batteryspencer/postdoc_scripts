@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
@@ -68,10 +69,11 @@ def main():
     all_cv_values = []
     
     for folder in folders:
-        lambda_values, cv_values, md_steps = read_simulation_data(folder, max_steps=max_steps)
-        all_lambda_values.extend(lambda_values)
-        all_cv_values.extend(cv_values)
-        total_md_steps += md_steps  # Accumulate total MD steps here
+        if os.path.exists(f'./{folder}/REPORT'):
+            lambda_values, cv_values, md_steps = read_simulation_data(folder, max_steps=max_steps)
+            all_lambda_values.extend(lambda_values)
+            all_cv_values.extend(cv_values)
+            total_md_steps += md_steps  # Accumulate total MD steps here
     
     lambda_values_per_cv = all_lambda_values[constraint_index::num_constraints]
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)

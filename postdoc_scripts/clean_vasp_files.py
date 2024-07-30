@@ -9,6 +9,7 @@ excluding XDATCAR, slurm*, and *~. If the maximum directory depth exceeds 10, it
 
 import os
 import fnmatch
+import time
 from alive_progress import alive_bar
 
 # List of file patterns to check and clean
@@ -16,9 +17,17 @@ file_patterns = [
     "cor*", "vaspr*", "CHG*", "OS*", "PCDAT", "IBZKPT", "EIG*", "DOSCAR", "PROCAR", "REPORT", "WAVE*", "vaspout.h5"
 ]
 
+# List of file patterns to delete only if they are at least 1 day old
+age_check_patterns = ["vaspr*", "CHG*"]
+
 # Function to get the relative path
 def get_relative_path(base, target):
     return os.path.relpath(target, base)
+
+# Function to check if a file is at least 1 day old
+def is_file_old(file_path):
+    file_age_in_seconds = time.time() - os.path.getmtime(file_path)
+    return file_age_in_seconds > 86400  # 86400 seconds in a day
 
 # Function to delete files matching the patterns in a given directory and track storage cleared
 def clean_files_in_directory(directory, base_dir, file_patterns, total_cleared):
@@ -27,6 +36,9 @@ def clean_files_in_directory(directory, base_dir, file_patterns, total_cleared):
         for file in matched_files:
             file_path = os.path.join(directory, file)
             try:
+                # Check if the file should be deleted based on age
+                if pattern in age_check_patterns and not is_file_old(file_path):
+                    continue
                 file_size = os.path.getsize(file_path)
                 os.remove(file_path)
                 total_cleared.append(file_size)
@@ -81,4 +93,3 @@ def get_human_readable_size(size_in_bytes):
 if __name__ == "__main__":
     clean_files(file_patterns)
     print("Cleanup completed.")
-

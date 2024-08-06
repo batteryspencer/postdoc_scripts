@@ -14,7 +14,7 @@ from alive_progress import alive_bar
 
 # List of file patterns to check and clean
 file_patterns = [
-    "cor*", "vaspr*", "CHG*", "OS*", "PCDAT", "IBZKPT", "EIG*", "DOSCAR", "PROCAR", "REPORT", "WAVE*", "vaspout.h5"
+    "cor*", "vaspr*", "CHG*", "OS*", "PCDAT", "IBZKPT", "EIG*", "DOSCAR", "PROCAR", "WAVE*", "vaspout.h5"
 ]
 
 # List of file patterns to delete only if they are at least 1 day old

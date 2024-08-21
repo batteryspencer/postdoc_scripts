@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Directory pattern to match
-DIR_PATTERN="seg??"
+DIR_PATTERN="seg?? seg???"
 
 # Frame limit variable
-FRAME_LIMIT=5000
+FRAME_LIMIT=10000
 
 # Temporary file for concatenation
 TEMP_FILE="temp_xdatcar"
@@ -12,16 +12,22 @@ TEMP_FILE="temp_xdatcar"
 # Check if temp file exists and remove it
 [ -f "$TEMP_FILE" ] && rm "$TEMP_FILE"
 
+# Find directories matching the pattern and sort them numerically
+dirs=$(ls -d $DIR_PATTERN 2>/dev/null | sort -V)
+
 # Loop through directories and concatenate XDATCAR files
 first_file=true
-for dir in $DIR_PATTERN; do
-    if $first_file; then
-        # Copy the header and the rest of the file for the first segment
-        cat "${dir}/XDATCAR" >> "${TEMP_FILE}"
-        first_file=false
-    else
-        # Skip the first 7 lines (header) for subsequent segments
-        tail -n +8 "${dir}/XDATCAR" >> "${TEMP_FILE}"
+for dir in $dirs; do
+    # Ensure the directory exists to avoid errors with missing directories
+    if [ -d "$dir" ]; then
+        if $first_file; then
+            # Copy the header and the rest of the file for the first segment
+            cat "${dir}/XDATCAR" >> "${TEMP_FILE}"
+            first_file=false
+        else
+            # Skip the first 7 lines (header) for subsequent segments
+            tail -n +8 "${dir}/XDATCAR" >> "${TEMP_FILE}"
+        fi
     fi
 done
 

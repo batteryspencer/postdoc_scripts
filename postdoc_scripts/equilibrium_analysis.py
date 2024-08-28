@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 # Define the number of steps to analyze
-NUM_STEPS_TO_ANALYZE = 10000
+NUM_STEPS_TO_ANALYZE = 30000
 
 # Define font sizes and tick parameters as constants
 LABEL_FONTSIZE = 18
@@ -164,6 +164,48 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     plt.title(title, fontsize=TITLE_FONTSIZE)
     plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.legend(fontsize=LEGEND_FONTSIZE)
+    plt.savefig(file_name)
+
+def plot_multiple_values(values, window_sizes, ylabel, file_name):
+    # plt.figure(figsize=(10, 6))
+    steps = range(len(values))
+
+    # Create the main plot
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Convert values to a Pandas Series to use rolling function
+    values_series = pd.Series(values)
+    colors = ['#4682B4', 'green', 'red']
+    for window_size in window_sizes:
+        rolling_mean = values_series.rolling(window=window_size).mean()  # Adjust the window size as needed
+
+        # Plot the rolling mean in black
+        non_nan_indices = ~np.isnan(rolling_mean)
+        filtered_rolling_mean = rolling_mean[non_nan_indices]
+        ax1.plot(np.arange(len(filtered_rolling_mean)), filtered_rolling_mean, label=f'{window_size / 1000:.1f} ps', linewidth=2, color=colors.pop(0))
+
+    ax1.set_xlabel('Time Step (fs)', fontsize=LABEL_FONTSIZE)
+    ax1.set_ylabel('Average Energy (eV)', fontsize=LABEL_FONTSIZE)
+    ax1.legend(fontsize=LEGEND_FONTSIZE)
+    ax1.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+
+    # Create a secondary y-axis
+    ax2 = ax1.twinx()
+
+    # Plot the raw data in gray
+    ax2.plot(steps, values, color='gray', alpha=0.7)
+    ax2.set_ylabel('Internal Energy (eV)', fontsize=LABEL_FONTSIZE)
+    ax2.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+
+    # Highlight the overall mean with a red dashed line
+    mean_value = np.mean(values[2000:])
+    ax2.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")
+
+    # Expand the y-axis limits for the secondary y-axis
+    ylim = ax2.get_ylim()
+    ylim_diff = ylim[1] - ylim[0]
+    ax2.set_ylim(mean_value - 0.6 * ylim_diff, mean_value + 0.6 * ylim_diff)
+
     plt.savefig(file_name)
 
 def print_top_frequencies(frequencies, amplitudes, data_type, top_n):
@@ -329,6 +371,8 @@ def main():
     window_size = 100
     plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
     plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
+    window_sizes = [500, 1500, 2500]
+    plot_multiple_values(total_energies, window_sizes, 'Total Energy (eV)', 'total_energy_trend_multiple.png')
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')

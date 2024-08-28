@@ -1,30 +1,52 @@
 #!/bin/bash
 
 # --- SBATCH Options ---
-#SBATCH --job-name=Pt111_PMF_1PropylH_Dissociation_C-H_1.15_CPU
+#SBATCH --job-name=Pt111_PMF_2PropylH_Dissociation_C-H_2.49
 #SBATCH --output=job_%j.out
 #SBATCH --error=job_%j.err
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=64  # max: 128
-#SBATCH --account=jcap
+#SBATCH --account=m1399
 #SBATCH --qos=regular  # regular
-#SBATCH --time=12:00:00  # max: 24:00:00 for regular
+#SBATCH --time=04:00:00  # max: 24:00:00 for regular
+#SBATCH --mail-user=pasumarv@purdue.edu
+#SBATCH --mail-type=END
 #SBATCH --constraint=cpu
+
+# This SLURM batch script manages VASP job submissions with support for:
+# - Multi-segment molecular dynamics (MD) calculations
+# - Non-MD calculations like geometry relaxation
+#
+# --- Checkpointing and Restarts ---
+# - Supports restarting from checkpoints in case of job failure or timeout.
+#
+# --- Segment Handling ---
+# - Divides the simulation into segments to handle long MD calculations or geometry relaxations.
+# - Sets up and processes each segment, ensuring completeness of output files.
+#
+# --- Convergence Checks ---
+# - Validates the completeness of CONTCAR and OUTCAR files to determine if each segment has converged.
+#
+# --- Self-Termination ---
+# - Automatically terminates the job if there is insufficient remaining time to complete the current segment.
+#
+# --- Post-Processing ---
+# - Supports Bader charge calculations if specified.
 
 function setup_environment {
     cd $SLURM_SUBMIT_DIR
-    module load vasp-tpc/6.3.2-cpu
+    module load vasp/6.4.1-cpu
     export OMP_NUM_THREADS=1
     export OMP_PLACES=threads
     export OMP_PROC_BIND=spread
-    export VASP_PP_PATH=/pscratch/sd/p/pbasera/incar/lib/apps/vasp/vasppot/
+    export VASP_PP_PATH=/global/homes/p/pasumart/usr/lib/apps/vasp/vasppot/
     if [ -f "generate_input_files.py" ] && [ ! -f "POSCAR" ] && [ ! -f "POTCAR" ] && [ ! -f "KPOINTS" ] && [ ! -f "INCAR" ]; then
-        export ASE_VASP_VDW=/pscratch/sd/p/pbasera/incar/lib/
+        export ASE_VASP_VDW=/global/homes/p/pasumart/usr/lib/
         echo "Generating input files..."
         python generate_input_files.py
     fi
     # Define the source and target paths
-    source_path="/pscratch/sd/p/pbasera/incar/lib/vdw_kernel.bindat"
+    source_path="/global/homes/p/pasumart/usr/lib/vdw_kernel.bindat"
     target_path="vdw_kernel.bindat"
     log_job_details
 }
@@ -223,28 +245,28 @@ function restart_from_checkpoint {
     fi
 }
 
-function log_execution_time {
+function log_runtime {
     # End timing
     end_time=$(date +%s)
-    execution_time=$((end_time - start_time))
+    runtime=$((end_time - start_time))
 
     # Calculate hours, minutes, and seconds
-    hours=$((execution_time / 3600))
-    minutes=$(( (execution_time % 3600) / 60 ))
-    seconds=$((execution_time % 60))
+    hours=$((runtime / 3600))
+    minutes=$(( (runtime % 3600) / 60 ))
+    seconds=$((runtime % 60))
 
     # Print the execution time
     if [ $num_segments -eq 1 ]; then
-        echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)"
+        echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($runtime seconds)"
     else
-        echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($execution_time seconds)" >> job.out
+        echo -e "\nJob execution time: $hours hours, $minutes minutes, $seconds seconds ($runtime seconds)" >> job.out
     fi
 }
 
 function post_process {
 
     # Log the execution time
-    log_execution_time
+    log_runtime
 
     # Remove the files from the current directory
     for file in $removefiles; do
@@ -276,6 +298,52 @@ function post_process {
     fi
 }
 
+# Function to convert time to seconds
+function time_to_seconds {
+    local time_str="$1"
+    local total_seconds=0
+
+    # Check if the time string contains a day part
+    if [[ "$time_str" == *-* ]]; then
+        IFS='-' read -r days time_str <<< "$time_str"
+        total_seconds=$((days * 86400))
+    fi
+
+    # Split the remaining time string and add hours, minutes, and seconds
+    IFS=: read -r hours minutes seconds <<< "$time_str"
+    if [[ -z "$seconds" ]]; then
+        if [[ -z "$minutes" ]]; then
+            seconds=$hours
+            hours=0
+        else
+            seconds=$minutes
+            minutes=$hours
+            hours=0
+        fi
+    fi
+
+    total_seconds=$((total_seconds + hours * 3600 + minutes * 60 + seconds))
+    echo $total_seconds
+}
+
+# Function to get remaining time
+function get_remaining_time {
+    squeue -j $SLURM_JOB_ID -h -o "%L"
+}
+
+# Check remaining time
+function check_time {
+    prev_runtime=$1
+    remaining_time=$(get_remaining_time)
+    remaining_seconds=$(time_to_seconds "$remaining_time")
+    required_time=$(($prev_runtime + $time_limit_min * 60))
+
+    if (( remaining_seconds < required_time )); then
+        echo "Not enough time to safely complete the segment. Terminating job."
+        scancel $SLURM_JOB_ID
+    fi
+}
+
 function main {
     setup_environment
 
@@ -287,8 +355,12 @@ function main {
     check_segment_completion
 
     start_segment_number=$((10#$last_seg + 1))
+    prev_runtime=0  # Initialize the previous runtime to 0
     for seg in $(seq $start_segment_number $num_segments)
-    do        
+    do
+        # Check if enough time is available
+        check_time $prev_runtime
+
         setup_simulation_directory
 
         # Run the VASP job:
@@ -306,6 +378,12 @@ function main {
             scancel $dependency_job_id
             break
         fi
+
+        # Update previous runtime and time limit
+        if (( runtime > prev_runtime )); then
+            prev_runtime=$runtime
+        fi
+
     done
 
     # Remove duplicate files
@@ -342,6 +420,7 @@ IS_MD_CALC=1  # Set this to 1 for MD calculations
 number_padding=2  # number padding for segment directories
 EXECUTABLE=vasp_std  # Define the VASP executable
 MAX_RESTARTS=10  # Set the maximum number of restarts here
+time_limit_min=30  # Set minimum additional time in minutes
 
 # --- Execute Main Logic ---
 main

@@ -141,17 +141,17 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     mean_value = np.mean(values)
     std_dev = np.std(values)
 
-    # Compute the rolling mean of the final 1000 steps
-    if len(values) >= 1000:
-        final_1000_mean = np.mean(values[-1000:])
+    # Compute the rolling mean of the final 2500 steps
+    if len(values) >= 2500:
+        final_2500_mean = np.mean(values[-2500:])
     else:
-        final_1000_mean = np.mean(values)  # If less than 1000 steps, take the mean of the entire array
+        final_2500_mean = np.mean(values)  # If less than 2500 steps, take the mean of the entire array
 
-    # Print the mean, standard deviation, and final 1000 steps rolling mean to the report file
+    # Print the mean, standard deviation, and final 2500 steps rolling mean to the report file
     with open(f'equilibrium_analysis_report.txt', 'a') as file:
         file.write(f"Mean {ylabel}: {mean_value:.2f}\n")
         file.write(f"Standard Deviation: {std_dev:.2f}\n")
-        file.write(f"Based on Final 1000 Steps, Equilibrated {ylabel}: {final_1000_mean:.2f}\n\n")
+        file.write(f"Based on Final 2500 Steps, Equilibrated {ylabel}: {final_2500_mean:.2f}\n\n")
 
     # Highlight the overall mean with a red dashed line
     plt.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")

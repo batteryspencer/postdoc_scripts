@@ -8,7 +8,8 @@
 #SBATCH --ntasks-per-node=4  # max: 128
 #SBATCH --account=m1399_g
 #SBATCH --qos=regular
-#SBATCH --time=04:00:00  # max: 24:00:00 for regular
+#SBATCH --time-min=3:00:00
+#SBATCH --time=12:00:00  # max: 24:00:00 for regular
 #SBATCH --mail-user=pasumarv@purdue.edu
 #SBATCH --mail-type=END
 #SBATCH --constraint=gpu

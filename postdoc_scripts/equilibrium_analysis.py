@@ -166,39 +166,64 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(file_name)
 
-def plot_multiple_values(values, window_sizes, ylabel, file_name):
-    # plt.figure(figsize=(10, 6))
-    steps = range(len(values))
+def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png'):
+    # Convert to a Pandas Series for easy rolling calculations
+    values_series = pd.Series(values)
+
+    # Number of steps per picosecond based on the timestep (default is 1 fs per timestep)
+    steps_per_ps = 1000 / timestep_fs
+    analysis_window_steps = int(analysis_window_ps * steps_per_ps)
+    last_few_steps = -analysis_window_steps
+
+    stability_results = {}
 
     # Create the main plot
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    # Convert values to a Pandas Series to use rolling function
-    values_series = pd.Series(values)
-    colors = ['#4682B4', 'green', 'red']
-    for window_size in window_sizes:
-        rolling_mean = values_series.rolling(window=window_size).mean()  # Adjust the window size as needed
+    # Color palette generation for any length of window_sizes
+    colors = plt.cm.Dark2(np.linspace(0, 1, len(window_sizes)))
 
-        # Plot the rolling mean in black
-        non_nan_indices = ~np.isnan(rolling_mean)
-        filtered_rolling_mean = rolling_mean[non_nan_indices]
-        ax1.plot(np.arange(len(filtered_rolling_mean)), filtered_rolling_mean, label=f'{window_size / 1000:.1f} ps', linewidth=2, color=colors.pop(0))
+    for idx, window_size in enumerate(window_sizes):
+        # Calculate rolling mean
+        rolling_mean = values_series.rolling(window=window_size).mean()
+        filtered_rolling_mean = rolling_mean.dropna()
 
+        # Focus only on the last part of the data (e.g., last 5 ps)
+        analysis_data = filtered_rolling_mean[last_few_steps:]
+        
+        # Calculate standard deviation in the analysis range
+        fluctuation = analysis_data.std()
+
+        # Stability check based on the threshold
+        stability_status = fluctuation <= stability_threshold
+        stability_results[window_size / 1000] = {
+            'fluctuation': fluctuation,
+            'is_stable': stability_status
+        }
+
+        # Print results
+        stability_status_str = "stable" if stability_status else "not stable"
+        print(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
+              f"Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)")
+
+        # Plot the rolling mean
+        ax1.plot(np.arange(len(filtered_rolling_mean)) * timestep_fs, filtered_rolling_mean,
+                 label=f'{window_size / steps_per_ps:.1f} ps', linewidth=2, color=colors[idx])
+
+    # Main axis formatting
     ax1.set_xlabel('Time Step (fs)', fontsize=LABEL_FONTSIZE)
-    ax1.set_ylabel('Average Energy (eV)', fontsize=LABEL_FONTSIZE)
+    ax1.set_ylabel(ylabel, fontsize=LABEL_FONTSIZE)
     ax1.legend(fontsize=LEGEND_FONTSIZE)
     ax1.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 
-    # Create a secondary y-axis
+    # Create a secondary y-axis for raw data
     ax2 = ax1.twinx()
-
-    # Plot the raw data in gray
-    ax2.plot(steps, values, color='gray', alpha=0.7)
+    ax2.plot(np.arange(len(values)) * timestep_fs, values, color='gray', alpha=0.7)
     ax2.set_ylabel('Internal Energy (eV)', fontsize=LABEL_FONTSIZE)
     ax2.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 
-    # Highlight the overall mean with a red dashed line
-    mean_value = np.mean(values[2000:])
+    # Highlight the overall mean with a red dashed line (optional: focus on the same analysis range)
+    mean_value = np.mean(values[last_few_steps:])
     ax2.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")
 
     # Expand the y-axis limits for the secondary y-axis
@@ -207,6 +232,8 @@ def plot_multiple_values(values, window_sizes, ylabel, file_name):
     ax2.set_ylim(mean_value - 0.6 * ylim_diff, mean_value + 0.6 * ylim_diff)
 
     plt.savefig(file_name)
+    print(stability_results)
+    return None
 
 def print_top_frequencies(frequencies, amplitudes, data_type, top_n):
     with open(f'equilibrium_analysis_report.txt', 'a') as file:
@@ -372,7 +399,7 @@ def main():
     plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
     plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
     window_sizes = [500, 1500, 2500]
-    plot_multiple_values(total_energies, window_sizes, 'Total Energy (eV)', 'total_energy_trend_multiple.png')
+    test_energy_stability(total_energies, window_sizes, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png')
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')

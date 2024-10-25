@@ -222,17 +222,13 @@ def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_
     ax2.set_ylabel('Internal Energy (eV)', fontsize=LABEL_FONTSIZE)
     ax2.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 
-    # Highlight the overall mean with a red dashed line (optional: focus on the same analysis range)
-    mean_value = np.mean(values[last_few_steps:])
-    ax2.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")
-
     # Expand the y-axis limits for the secondary y-axis
     ylim = ax2.get_ylim()
     ylim_diff = ylim[1] - ylim[0]
+    mean_value = np.mean(values[last_few_steps:])
     ax2.set_ylim(mean_value - 0.6 * ylim_diff, mean_value + 0.6 * ylim_diff)
 
     plt.savefig(file_name)
-    print(stability_results)
     return None
 
 def print_top_frequencies(frequencies, amplitudes, data_type, top_n):

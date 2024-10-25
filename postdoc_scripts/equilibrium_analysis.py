@@ -206,6 +206,11 @@ def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_
         print(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
               f"Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)")
 
+        # Write the window size stability analysis to the report file
+        with open('equilibrium_analysis_report.txt', 'a') as file:
+            file.write(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
+                    f"Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)\n")
+
         # Plot the rolling mean
         ax1.plot(np.arange(len(filtered_rolling_mean)) * timestep_fs, filtered_rolling_mean,
                  label=f'{window_size / steps_per_ps:.1f} ps', linewidth=2, color=colors[idx])

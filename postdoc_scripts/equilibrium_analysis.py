@@ -191,25 +191,27 @@ def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_
         # Focus only on the last part of the data (e.g., last 5 ps)
         analysis_data = filtered_rolling_mean[last_few_steps:]
         
-        # Calculate standard deviation in the analysis range
+        # Calculate standard deviation and mean in the analysis range
         fluctuation = analysis_data.std()
+        mean_energy = analysis_data.mean()
 
         # Stability check based on the threshold
         stability_status = fluctuation <= stability_threshold
         stability_results[window_size / 1000] = {
             'fluctuation': fluctuation,
+            'mean_energy': mean_energy,
             'is_stable': stability_status
         }
 
         # Print results
         stability_status_str = "stable" if stability_status else "not stable"
         print(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
-              f"Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)")
+              f"Mean: {mean_energy:.2f} eV, Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)")
 
         # Write the window size stability analysis to the report file
         with open('equilibrium_analysis_report.txt', 'a') as file:
             file.write(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
-                    f"Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)\n")
+                       f"Mean: {mean_energy:.2f} eV, Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)\n")
 
         # Plot the rolling mean
         ax1.plot(np.arange(len(filtered_rolling_mean)) * timestep_fs, filtered_rolling_mean,

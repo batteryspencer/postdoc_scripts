@@ -38,42 +38,130 @@ def read_force_stats(file_path, target_steps=None):
 
         return stats
 
-# Calculate areas for the mean, upper, and lower force curves
-def calculate_area(x, y):
-    zero_crossings = np.where(np.diff(np.sign(y)))[0]
-    roots = []
+def interpolate_and_find_roots(x, y, num_points=500):
+    """
+    Interpolates the given x, y data and finds zero crossings.
 
-    def interpolate_zero_crossing(x1, y1, x2, y2):
-        return x1 - y1 * (x2 - x1) / (y2 - y1)
+    Args:
+    - x: Array of constrained bond lengths.
+    - y: Array of mean forces.
+    - num_points: Number of points for fine interpolation.
 
-    if len(zero_crossings) < 2:
-        # Fit a second-order polynomial if not enough zero crossings are found
-        coeffs = np.polyfit(x, y, 2)
-        p = np.poly1d(coeffs)
-        roots = np.roots(p).real
-        roots.sort()
-        if len(roots) >= 2:
-            zero_crossings = roots[:2]
-            x_integration = np.linspace(min(zero_crossings), max(zero_crossings), num=500)
-            y_integration = p(x_integration)
-            idx_start = np.argmin(np.abs(x_integration - zero_crossings[0]))
-            idx_end = np.argmin(np.abs(x_integration - zero_crossings[1]))
-            area = abs(trapz(y_integration[idx_start:idx_end + 1], x_integration[idx_start:idx_end + 1]))
-            return area, roots
+    Returns:
+    - interp_func: The interpolation function.
+    - fine_x: Fine-grained x-values for plotting the interpolated curve.
+    - fine_y: Corresponding interpolated y-values for fine_x.
+    - roots: Zero crossings (roots) of the interpolated curve.
+    """
+    # Use cubic interpolation for smoothness
+    interp_func = interp1d(x, y, kind="cubic", fill_value="extrapolate")
+    fine_x = np.linspace(min(x), max(x), num_points)
+    fine_y = interp_func(fine_x)
 
-    if len(zero_crossings) >= 2:
-        zero_crossings.sort()
-        start, end = zero_crossings[0], zero_crossings[1]
-        roots = [
-            interpolate_zero_crossing(x[start], y[start], x[start+1], y[start+1]),
-            interpolate_zero_crossing(x[end], y[end], x[end+1], y[end+1])
-        ]
-        start_idx = np.argmin(np.abs(x - roots[0]))
-        end_idx = np.argmin(np.abs(x - roots[1]))
-        area = abs(trapz(y[start_idx:end_idx + 1], x[start_idx:end_idx + 1]))
-        return area, roots
+    # Find zero crossings
+    zero_crossings = np.where(np.diff(np.sign(fine_y)))[0]
+    roots = [fine_x[zc] for zc in zero_crossings]
 
-    return None, roots
+    return interp_func, fine_x, fine_y, roots
+
+def compute_slope(interp_func, x_point, h=1e-6):
+    """
+    Computes the slope at a specific point using the central difference formula.
+
+    Args:
+    - interp_func: Interpolated function (callable).
+    - x_point: The x-value where the slope is to be computed.
+    - h: Small step size for finite difference (default: 1e-6).
+
+    Returns:
+    - float: The slope at x_point.
+    """
+    return (interp_func(x_point + h) - interp_func(x_point - h)) / (2 * h)
+
+def compute_barriers_and_states(fine_x, fine_y, interp_func, roots):
+    """
+    Computes forward and reverse barriers and classifies states based on roots.
+
+    Args:
+    - fine_x: Fine-grained x-values for the interpolated curve.
+    - fine_y: Corresponding y-values for fine_x.
+    - interp_func: The interpolation function.
+    - roots: Zero crossings of the interpolated curve.
+
+    Returns:
+    - results: A dictionary containing roots, state types, forward/reverse barriers, and free energy change.
+    """
+    state_types = []
+    forward_barrier, reverse_barrier = 0, 0
+
+    if len(roots) == 1:
+        root = roots[0]
+        root_index = np.argmin(np.abs(fine_x - root))
+        slope = compute_slope(interp_func, root)
+
+        if slope > 0:
+            state_types = ["Transition State"]
+            forward_barrier = abs(trapz(fine_y[:root_index + 1], fine_x[:root_index + 1]))
+            reverse_barrier = abs(trapz(fine_y[root_index:], fine_x[root_index:]))
+        else:
+            # Check if it is initial or final state
+            points_after = len(fine_x[fine_x > root])
+            points_before = len(fine_x[fine_x < root])
+            MIN_POINTS_TO_DETERMINE_STATE = 3
+            if points_after >= MIN_POINTS_TO_DETERMINE_STATE:
+                state_types = ["Initial State"]
+                forward_barrier = abs(trapz(fine_y[root_index:], fine_x[root_index:]))
+            elif points_before >= MIN_POINTS_TO_DETERMINE_STATE:
+                state_types = ["Final State"]
+                reverse_barrier = abs(trapz(fine_y[:root_index], fine_x[:root_index]))
+    elif len(roots) == 2:
+        root_index1 = np.argmin(np.abs(fine_x - roots[0]))
+        root_index2 = np.argmin(np.abs(fine_x - roots[1]))
+        slope1 = compute_slope(interp_func, roots[0])
+        slope2 = compute_slope(interp_func, roots[1])
+
+        if slope1 < 0 and slope2 > 0:
+            state_types = ["Initial State", "Transition State"]
+            forward_barrier = abs(trapz(fine_y[root_index1:root_index2 + 1], fine_x[root_index1:root_index2 + 1]))
+        elif slope1 > 0 and slope2 < 0:
+            state_types = ["Transition State", "Final State"]
+            reverse_barrier = abs(trapz(fine_y[root_index1:root_index2 + 1], fine_x[root_index1:root_index2 + 1]))
+    elif len(roots) == 3:
+        root_index1 = np.argmin(np.abs(fine_x - roots[0]))
+        root_index2 = np.argmin(np.abs(fine_x - roots[1]))
+        root_index3 = np.argmin(np.abs(fine_x - roots[2]))
+        state_types = ["Initial State", "Transition State", "Final State"]
+        forward_barrier = abs(trapz(fine_y[root_index1:root_index2 + 1], fine_x[root_index1:root_index2 + 1]))
+        reverse_barrier = abs(trapz(fine_y[root_index2:root_index3 + 1], fine_x[root_index2:root_index3 + 1]))
+
+    free_energy_change = forward_barrier + reverse_barrier
+
+    results = {
+        "roots": roots,
+        "state_types": state_types,
+        "forward_barrier": forward_barrier,
+        "reverse_barrier": reverse_barrier,
+        "free_energy_change": free_energy_change,
+    }
+
+    return results
+
+def calculate_barriers(x, y):
+    """
+    High-level function to calculate barriers and provide interpolation data.
+
+    Args:
+    - x: Array of constrained bond lengths.
+    - y: Array of mean forces.
+
+    Returns:
+    - results: A dictionary containing roots, state types, forward/reverse barriers, and free energy change.
+    - fine_x: Fine-grained x-values for plotting the interpolated curve.
+    - fine_y: Corresponding interpolated y-values for fine_x.
+    """
+    interp_func, fine_x, fine_y, roots = interpolate_and_find_roots(x, y)
+    results = compute_barriers_and_states(fine_x, fine_y, interp_func, roots)
+    return results, fine_x, fine_y
 
 # for target_steps in np.arange(500, 10500, 500):
 for target_steps in [None]:

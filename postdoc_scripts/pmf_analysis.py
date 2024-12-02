@@ -164,7 +164,6 @@ def calculate_barriers(x, y):
     results = compute_barriers_and_states(fine_x, fine_y, interp_func, roots)
     return results, fine_x, fine_y
 
-# target_steps = None or np.arange(500, 10500, 500)
 def process_data(target_steps=None):
     data = {'Constrained_Bond_Length (Å)': [], 'Mean_Force (eV/Å)': [], 'Standard_Deviation (eV/Å)': [], 'MD_Steps': []}
     for folder in glob.glob("[0-9].[0-9][0-9]_*"):
@@ -228,6 +227,8 @@ def plot_data(x, y, std_dev, fine_x=None, fine_y=None, plot_interpolated_curve=T
         plt.savefig('mean_force_plot.png', dpi=300, bbox_inches='tight')
 
 def main():
+    # target_steps=None will use the data until the last step of the simulation.
+    # target_steps=np.arange(500, 10500, 500) will use the specified steps.
     df = process_data(target_steps=None)
     x = df['Constrained_Bond_Length (Å)'].to_numpy()
     y = df['Mean_Force (eV/Å)'].to_numpy()

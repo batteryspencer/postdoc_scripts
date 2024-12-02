@@ -186,6 +186,33 @@ def analyze_barriers(x, y, std_dev):
     reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
     return results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y
 
+def plot_data(x, y, std_dev, fine_x=None, fine_y=None, plot_interpolated_curve=True, save_to_file=False):
+    plt.figure(figsize=(10, 6))
+    ax = plt.gca()
+
+    # Plot the interpolated curve if enabled
+    if plot_interpolated_curve and fine_x is not None and fine_y is not None:
+        plt.plot(fine_x, fine_y, label="Interpolated Curve (Mean Force)", color="red")
+
+    # Plot error bars
+    plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
+
+    # Add a legend if the interpolated curve is plotted
+    if plot_interpolated_curve:
+        plt.legend(fontsize=LEGEND_FONTSIZE)
+
+    # Fill the area under the curve
+    verts = [(x[0], 0)] + list(zip(x, y)) + [(x[-1], 0)]
+    poly = Polygon(verts, facecolor='0.9', edgecolor='0.1')
+    ax.add_patch(poly)
+
+    # Add labels and save the plot
+    plt.xlabel("Constrained Bond Length (Å)", fontsize=LABEL_FONTSIZE)
+    plt.ylabel("Mean Force (eV/Å)", fontsize=LABEL_FONTSIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    if save_to_file:
+        plt.savefig('mean_force_plot.png', dpi=300, bbox_inches='tight')
+
 df = process_data(target_steps=None)
 
 # Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length (Å)' 
@@ -215,37 +242,4 @@ with open("pmf_analysis_results.txt", "w") as text_file:
     text_file.write(table_string + '\n\n')
     text_file.write(results_string + '\n')
 
-# Set this to True or False to toggle plotting of the interpolated curve
-plot_interpolated_curve = False
-
-plt.figure(figsize=(10, 6))
-ax = plt.gca()
-
-# Plot the interpolated curve only if the option is enabled
-if plot_interpolated_curve:
-    plt.plot(fine_x, fine_y, label="Interpolated Curve (Mean Force)", color="red")
-
-# Plot the data points with error bars
-plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
-# plt.plot(x, y + std_dev, linestyle='--', color='black', alpha=0.5)
-# plt.plot(x, y - std_dev, linestyle='--', color='black', alpha=0.5)
-
-# Add a legend only if the interpolated curve is plotted
-if plot_interpolated_curve:
-    plt.legend(fontsize=LEGEND_FONTSIZE)
-
-plt.xlabel("Constrained Bond Length (Å)", fontsize=LABEL_FONTSIZE)
-plt.ylabel("Mean Force (eV/Å)", fontsize=LABEL_FONTSIZE)
-
-# Create a polygon to fill the area under the curve
-verts = [(df['Constrained_Bond_Length (Å)' ].iloc[0], 0)] + list(zip(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ])) + [(df['Constrained_Bond_Length (Å)' ].iloc[-1], 0)]
-poly = Polygon(verts, facecolor='0.9', edgecolor='0.1')
-ax.add_patch(poly)
-
-plt.title('Mean Force vs. Constrained Bond Length', fontsize=TITLE_FONTSIZE)
-plt.xlabel('Constrained Bond Length (Å)', fontsize=LABEL_FONTSIZE)
-plt.ylabel('Mean Force (eV/Å)', fontsize=LABEL_FONTSIZE)
-plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
-
-# Save the figure
-plt.savefig('mean_force_plot.png', dpi=300, bbox_inches='tight')
+plot_data(x, y, std_dev, fine_x=fine_x, fine_y=fine_y, plot_interpolated_curve=True, save_to_file=True)

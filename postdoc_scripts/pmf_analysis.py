@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
+from scipy.interpolate import interp1d
 from scipy.integrate import trapz
 
 # Define font sizes and tick parameters as constants
@@ -189,22 +190,16 @@ for target_steps in [None]:
     y = df['Mean_Force (eV/Å)' ].to_numpy()
     std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
 
-    # Calculate the standard areas and the areas with error adjustments
-    activation_barrier, roots = calculate_area(x, y)
-    area_upper, _ = calculate_area(x, y + std_dev)
-    area_lower, _ = calculate_area(x, y - std_dev)
+    # Calculate barriers and interpolation for original data
+    results, fine_x, fine_y = calculate_barriers(x, y)
 
-    # Calculate the uncertainty as half the difference between the upper and lower areas
-    if area_upper is not None and area_lower is not None:
-        # Calculate activation barrier error as half the absolute difference between upper and lower area estimates.
-        activation_barrier_error = np.abs(area_upper - area_lower) / 2
-        results_string = f"Activation Barrier (Area under the curve): {activation_barrier:.2f} ± {activation_barrier_error:.2f} eV\n"
-    else:
-        results_string = "Not enough zero crossings found to compute the area and its error."
-    
-    # Add roots information to the results string
-    if len(roots) >= 2:
-        results_string += f"Equilibrium Bond Distances: Initial State = {roots[0]:.3f} Å, Transition State = {roots[1]:.3f} Å\n"
+    # Calculate barriers for upper and lower limits
+    results_upper, _, _ = calculate_barriers(x, y + std_dev)
+    results_lower, _, _ = calculate_barriers(x, y - std_dev)
+
+    # Compute standard deviations as half the difference between upper and lower estimates
+    forward_barrier_std = abs(results_upper["forward_barrier"] - results_lower["forward_barrier"]) / 2
+    reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)

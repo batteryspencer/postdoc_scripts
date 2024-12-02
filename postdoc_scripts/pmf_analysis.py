@@ -221,12 +221,27 @@ with open("pmf_analysis_results.txt", "w") as text_file:
     text_file.write(table_string + '\n\n')
     text_file.write(results_string + '\n')
 
-# Plotting
+# Set this to True or False to toggle plotting of the interpolated curve
+plot_interpolated_curve = False
+
 plt.figure(figsize=(10, 6))
 ax = plt.gca()
-plt.errorbar(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ], yerr=df['Standard_Deviation (eV/Å)' ], fmt='o', color='black', ecolor='black', capsize=3.5)
-# plt.plot(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ] + df['Standard_Deviation (eV/Å)' ], linestyle='--', color='black', alpha=0.5)
-# plt.plot(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ] - df['Standard_Deviation (eV/Å)' ], linestyle='--', color='black', alpha=0.5)
+
+# Plot the interpolated curve only if the option is enabled
+if plot_interpolated_curve:
+    plt.plot(fine_x, fine_y, label="Interpolated Curve (Mean Force)", color="red")
+
+# Plot the data points with error bars
+plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
+# plt.plot(x, y + std_dev, linestyle='--', color='black', alpha=0.5)
+# plt.plot(x, y - std_dev, linestyle='--', color='black', alpha=0.5)
+
+# Add a legend only if the interpolated curve is plotted
+if plot_interpolated_curve:
+    plt.legend(fontsize=LEGEND_FONTSIZE)
+
+plt.xlabel("Constrained Bond Length (Å)", fontsize=LABEL_FONTSIZE)
+plt.ylabel("Mean Force (eV/Å)", fontsize=LABEL_FONTSIZE)
 
 # Create a polygon to fill the area under the curve
 verts = [(df['Constrained_Bond_Length (Å)' ].iloc[0], 0)] + list(zip(df['Constrained_Bond_Length (Å)' ], df['Mean_Force (eV/Å)' ])) + [(df['Constrained_Bond_Length (Å)' ].iloc[-1], 0)]
@@ -237,4 +252,6 @@ plt.title('Mean Force vs. Constrained Bond Length', fontsize=TITLE_FONTSIZE)
 plt.xlabel('Constrained Bond Length (Å)', fontsize=LABEL_FONTSIZE)
 plt.ylabel('Mean Force (eV/Å)', fontsize=LABEL_FONTSIZE)
 plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+
+# Save the figure
 plt.savefig('mean_force_plot.png', dpi=300, bbox_inches='tight')

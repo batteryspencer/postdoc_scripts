@@ -227,22 +227,25 @@ def plot_data(x, y, std_dev, fine_x=None, fine_y=None, plot_interpolated_curve=T
     if save_to_file:
         plt.savefig('mean_force_plot.png', dpi=300, bbox_inches='tight')
 
-df = process_data(target_steps=None)
+def main():
+    df = process_data(target_steps=None)
+    x = df['Constrained_Bond_Length (Å)'].to_numpy()
+    y = df['Mean_Force (eV/Å)'].to_numpy()
+    std_dev = df['Standard_Deviation (eV/Å)'].to_numpy()
 
-# Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length (Å)' 
-x = df['Constrained_Bond_Length (Å)' ].to_numpy()
-y = df['Mean_Force (eV/Å)' ].to_numpy()
-std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
+    results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y = analyze_barriers(x, y, std_dev)
+    results_string = format_results(results, forward_barrier_std, reverse_barrier_std)
 
-results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y = analyze_barriers(x, y, std_dev)
-results_string = format_results(results, forward_barrier_std, reverse_barrier_std)
+    # Print data in a table format and save it to a text file
+    table_string = df.to_string(index=False)
+    print(table_string + '\n')
+    print(results_string)
+    with open("pmf_analysis_results.txt", "w") as text_file:
+        text_file.write(table_string + '\n\n')
+        text_file.write(results_string + '\n')
 
-# Print data in a table format and save it to a text file
-table_string = df.to_string(index=False)
-print(table_string + '\n')
-print(results_string)
-with open("pmf_analysis_results.txt", "w") as text_file:
-    text_file.write(table_string + '\n\n')
-    text_file.write(results_string + '\n')
+    # Plot the data
+    plot_data(x, y, std_dev, fine_x=fine_x, fine_y=fine_y, plot_interpolated_curve=True, save_to_file=True)
 
-plot_data(x, y, std_dev, fine_x=fine_x, fine_y=fine_y, plot_interpolated_curve=True, save_to_file=True)
+if __name__ == "__main__":
+    main()

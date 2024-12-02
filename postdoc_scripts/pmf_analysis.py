@@ -164,54 +164,49 @@ def calculate_barriers(x, y):
     results = compute_barriers_and_states(fine_x, fine_y, interp_func, roots)
     return results, fine_x, fine_y
 
-# for target_steps in np.arange(500, 10500, 500):
-for target_steps in [None]:
-    # This dictionary will hold our data
-    data = {'Constrained_Bond_Length (Å)' : [], 'Mean_Force (eV/Å)' : [], 'Standard_Deviation (eV/Å)' : [], 'MD_Steps': []}
-
-    # Assuming your directories are named in the '1.06_793' format and are in the current working directory
+# target_steps = None or np.arange(500, 10500, 500)
+def process_data(target_steps=None):
+    data = {'Constrained_Bond_Length (Å)': [], 'Mean_Force (eV/Å)': [], 'Standard_Deviation (eV/Å)': [], 'MD_Steps': []}
     for folder in glob.glob("[0-9].[0-9][0-9]_*"):
         file_path = os.path.join(folder, 'force_stats_report.txt')
         if os.path.isfile(file_path):
             stats = read_force_stats(file_path, target_steps=target_steps)
-            data['Constrained_Bond_Length (Å)' ].append(stats['CV'])
-            data['Mean_Force (eV/Å)' ].append(stats['Mean Force'])
-            data['Standard_Deviation (eV/Å)' ].append(stats['Standard Deviation'])
+            data['Constrained_Bond_Length (Å)'].append(stats['CV'])
+            data['Mean_Force (eV/Å)'].append(stats['Mean Force'])
+            data['Standard_Deviation (eV/Å)'].append(stats['Standard Deviation'])
             data['MD_Steps'].append(stats['MD steps'])
+    df = pd.DataFrame(data).sort_values(by=['Constrained_Bond_Length (Å)'])
+    return df
 
-    # Create a DataFrame from the data
-    df = pd.DataFrame(data)
+df = process_data(target_steps=None)
 
-    # Sort the DataFrame based on the constrained bond length
-    df = df.sort_values(by=['Constrained_Bond_Length (Å)' ])
+# Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length (Å)' 
+x = df['Constrained_Bond_Length (Å)' ].to_numpy()
+y = df['Mean_Force (eV/Å)' ].to_numpy()
+std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
 
-    # Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length (Å)' 
-    x = df['Constrained_Bond_Length (Å)' ].to_numpy()
-    y = df['Mean_Force (eV/Å)' ].to_numpy()
-    std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
+# Calculate barriers and interpolation for original data
+results, fine_x, fine_y = calculate_barriers(x, y)
 
-    # Calculate barriers and interpolation for original data
-    results, fine_x, fine_y = calculate_barriers(x, y)
+# Calculate barriers for upper and lower limits
+results_upper, _, _ = calculate_barriers(x, y + std_dev)
+results_lower, _, _ = calculate_barriers(x, y - std_dev)
 
-    # Calculate barriers for upper and lower limits
-    results_upper, _, _ = calculate_barriers(x, y + std_dev)
-    results_lower, _, _ = calculate_barriers(x, y - std_dev)
+# Compute standard deviations as half the difference between upper and lower estimates
+forward_barrier_std = abs(results_upper["forward_barrier"] - results_lower["forward_barrier"]) / 2
+reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
 
-    # Compute standard deviations as half the difference between upper and lower estimates
-    forward_barrier_std = abs(results_upper["forward_barrier"] - results_lower["forward_barrier"]) / 2
-    reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
-
-    results_string = 'Activation Barriers (Area under the curve):\n'
-    if 'forward_barrier' in results:
-        results_string += f"Forward Barrier: {results['forward_barrier']:.2f} ± {forward_barrier_std:.2f} eV\n"
-    if 'reverse_barrier' in results:
-        results_string += f"Reverse Barrier: {results['reverse_barrier']:.2f} ± {reverse_barrier_std:.2f} eV\n"
-    if len(results['roots']) >= 1:
-        results_string += "\nEquilibrium Bond Distances: \n"
-        for i, state in enumerate(results['state_types']):
-            results_string += f"{state}: {results['roots'][i]:.3f} Å\n"
-    else:
-        results_string += "No zero crossings found."
+results_string = 'Activation Barriers (Area under the curve):\n'
+if 'forward_barrier' in results:
+    results_string += f"Forward Barrier: {results['forward_barrier']:.2f} ± {forward_barrier_std:.2f} eV\n"
+if 'reverse_barrier' in results:
+    results_string += f"Reverse Barrier: {results['reverse_barrier']:.2f} ± {reverse_barrier_std:.2f} eV\n"
+if len(results['roots']) >= 1:
+    results_string += "\nEquilibrium Bond Distances: \n"
+    for i, state in enumerate(results['state_types']):
+        results_string += f"{state}: {results['roots'][i]:.3f} Å\n"
+else:
+    results_string += "No zero crossings found."
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)

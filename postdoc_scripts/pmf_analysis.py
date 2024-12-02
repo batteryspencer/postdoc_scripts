@@ -201,6 +201,18 @@ for target_steps in [None]:
     forward_barrier_std = abs(results_upper["forward_barrier"] - results_lower["forward_barrier"]) / 2
     reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
 
+    results_string = 'Activation Barriers (Area under the curve):\n'
+    if 'forward_barrier' in results:
+        results_string += f"Forward Barrier: {results['forward_barrier']:.2f} ± {forward_barrier_std:.2f} eV\n"
+    if 'reverse_barrier' in results:
+        results_string += f"Reverse Barrier: {results['reverse_barrier']:.2f} ± {reverse_barrier_std:.2f} eV\n"
+    if len(results['roots']) >= 1:
+        results_string += "\nEquilibrium Bond Distances: \n"
+        for i, state in enumerate(results['state_types']):
+            results_string += f"{state}: {results['roots'][i]:.3f} Å\n"
+    else:
+        results_string += "No zero crossings found."
+
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)
 print(table_string + '\n')

@@ -178,6 +178,14 @@ def process_data(target_steps=None):
     df = pd.DataFrame(data).sort_values(by=['Constrained_Bond_Length (Å)'])
     return df
 
+def analyze_barriers(x, y, std_dev):
+    results, fine_x, fine_y = calculate_barriers(x, y)
+    results_upper, _, _ = calculate_barriers(x, y + std_dev)
+    results_lower, _, _ = calculate_barriers(x, y - std_dev)
+    forward_barrier_std = abs(results_upper["forward_barrier"] - results_lower["forward_barrier"]) / 2
+    reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
+    return results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y
+
 df = process_data(target_steps=None)
 
 # Assuming 'df' is the DataFrame with your data sorted by 'Constrained_Bond_Length (Å)' 
@@ -185,16 +193,7 @@ x = df['Constrained_Bond_Length (Å)' ].to_numpy()
 y = df['Mean_Force (eV/Å)' ].to_numpy()
 std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
 
-# Calculate barriers and interpolation for original data
-results, fine_x, fine_y = calculate_barriers(x, y)
-
-# Calculate barriers for upper and lower limits
-results_upper, _, _ = calculate_barriers(x, y + std_dev)
-results_lower, _, _ = calculate_barriers(x, y - std_dev)
-
-# Compute standard deviations as half the difference between upper and lower estimates
-forward_barrier_std = abs(results_upper["forward_barrier"] - results_lower["forward_barrier"]) / 2
-reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
+results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y = analyze_barriers(x, y, std_dev)
 
 results_string = 'Activation Barriers (Area under the curve):\n'
 if 'forward_barrier' in results:

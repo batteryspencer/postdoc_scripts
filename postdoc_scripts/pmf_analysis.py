@@ -186,6 +186,20 @@ def analyze_barriers(x, y, std_dev):
     reverse_barrier_std = abs(results_upper["reverse_barrier"] - results_lower["reverse_barrier"]) / 2
     return results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y
 
+def format_results(results, forward_barrier_std, reverse_barrier_std):
+    results_string = 'Activation Barriers (Area under the curve):\n'
+    if 'forward_barrier' in results:
+        results_string += f"Forward Barrier: {results['forward_barrier']:.2f} ± {forward_barrier_std:.2f} eV\n"
+    if 'reverse_barrier' in results:
+        results_string += f"Reverse Barrier: {results['reverse_barrier']:.2f} ± {reverse_barrier_std:.2f} eV\n"
+    if len(results['roots']) >= 1:
+        results_string += "\nEquilibrium Bond Distances: \n"
+        for i, state in enumerate(results['state_types']):
+            results_string += f"{state}: {results['roots'][i]:.3f} Å\n"
+    else:
+        results_string += "No zero crossings found."
+    return results_string
+
 def plot_data(x, y, std_dev, fine_x=None, fine_y=None, plot_interpolated_curve=True, save_to_file=False):
     plt.figure(figsize=(10, 6))
     ax = plt.gca()
@@ -221,18 +235,7 @@ y = df['Mean_Force (eV/Å)' ].to_numpy()
 std_dev = df['Standard_Deviation (eV/Å)' ].to_numpy()
 
 results, forward_barrier_std, reverse_barrier_std, fine_x, fine_y = analyze_barriers(x, y, std_dev)
-
-results_string = 'Activation Barriers (Area under the curve):\n'
-if 'forward_barrier' in results:
-    results_string += f"Forward Barrier: {results['forward_barrier']:.2f} ± {forward_barrier_std:.2f} eV\n"
-if 'reverse_barrier' in results:
-    results_string += f"Reverse Barrier: {results['reverse_barrier']:.2f} ± {reverse_barrier_std:.2f} eV\n"
-if len(results['roots']) >= 1:
-    results_string += "\nEquilibrium Bond Distances: \n"
-    for i, state in enumerate(results['state_types']):
-        results_string += f"{state}: {results['roots'][i]:.3f} Å\n"
-else:
-    results_string += "No zero crossings found."
+results_string = format_results(results, forward_barrier_std, reverse_barrier_std)
 
 # Print data in a table format and save it to a text file
 table_string = df.to_string(index=False)

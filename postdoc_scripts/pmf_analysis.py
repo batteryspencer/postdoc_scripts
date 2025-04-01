@@ -14,7 +14,7 @@ LEGEND_FONTSIZE = 14
 TICK_LENGTH_MAJOR = 8
 TICK_WIDTH_MAJOR = 1
 MIN_POINTS_FOR_EXTRAPOLATION = 3
-MAX_POINTS_FOR_FIT = 7
+MAX_POINTS_FOR_FIT = 6
 POLY_ORDER = 3
 
 # This function reads the force_stats_report.txt and extracts the values
@@ -99,38 +99,58 @@ def calculate_pmf(x, y, std_dev):
     y_sorted_raw = np.array(y)[np.argsort(x)]
 
     if is_val is None:
-        # Extrapolate on the left side using a polynomial fit
+        # Extrapolate on the left side using a polynomial fit with fallback
         left_mask = x_sorted_raw < ts_val
         if np.sum(left_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
             x_left = x_sorted_raw[left_mask]
             y_left = y_sorted_raw[left_mask]
-            n_points = min(MAX_POINTS_FOR_FIT, len(x_left))
-            x_fit = x_left[:n_points]
-            y_fit = y_left[:n_points]
-            coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
-            roots = np.roots(coeffs)
-            # Consider only real roots less than ts_val
-            real_roots = roots[np.isreal(roots)].real
-            candidates = real_roots[real_roots < ts_val]
-            if len(candidates) > 0:
-                # Choose the candidate closest to ts_val
-                is_val = candidates[np.argmin(np.abs(ts_val - candidates))]
+            n_points_initial = min(MAX_POINTS_FOR_FIT, len(x_left))
+            is_found = False
+            # Loop from n_points_initial down to 2
+            for n_points in range(n_points_initial, 1, -1):
+                # Adjust polynomial order based on available points
+                current_poly_order = POLY_ORDER if n_points > POLY_ORDER else n_points - 1
+                if current_poly_order < 1:
+                    continue
+                x_fit = x_left[:n_points]
+                y_fit = y_left[:n_points]
+                coeffs = np.polyfit(x_fit, y_fit, current_poly_order)
+                roots = np.roots(coeffs)
+                real_roots = roots[np.isreal(roots)].real
+                candidates = real_roots[real_roots < ts_val]
+                if len(candidates) > 0:
+                    is_val = candidates[np.argmin(np.abs(ts_val - candidates))]
+                    is_found = True
+                    break
+            if not is_found:
+                is_val = None
 
     if fs_val is None:
-        # Extrapolate on the right side using a polynomial fit
+        # Extrapolate on the right side using a polynomial fit with fallback
         right_mask = x_sorted_raw > ts_val
         if np.sum(right_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
             x_right = x_sorted_raw[right_mask]
             y_right = y_sorted_raw[right_mask]
-            n_points = min(MAX_POINTS_FOR_FIT, len(x_right))
-            x_fit = x_right[-n_points:]
-            y_fit = y_right[-n_points:]
-            coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
-            roots = np.roots(coeffs)
-            real_roots = roots[np.isreal(roots)].real
-            candidates = real_roots[real_roots > ts_val]
-            if len(candidates) > 0:
-                fs_val = candidates[np.argmin(np.abs(candidates - ts_val))]
+            n_points_initial = min(MAX_POINTS_FOR_FIT, len(x_right))
+            fs_found = False
+            # Loop from n_points_initial down to 2
+            for n_points in range(n_points_initial, 1, -1):
+                # Adjust polynomial order based on available points
+                current_poly_order = POLY_ORDER if n_points > POLY_ORDER else n_points - 1
+                if current_poly_order < 1:
+                    continue
+                x_fit = x_right[-n_points:]
+                y_fit = y_right[-n_points:]
+                coeffs = np.polyfit(x_fit, y_fit, current_poly_order)
+                roots = np.roots(coeffs)
+                real_roots = roots[np.isreal(roots)].real
+                candidates = real_roots[real_roots > ts_val]
+                if len(candidates) > 0:
+                    fs_val = candidates[np.argmin(np.abs(candidates - ts_val))]
+                    fs_found = True
+                    break
+            if not fs_found:
+                fs_val = None
 
     # Insert the intercepts into the data for integration
     x_extended = np.concatenate((x, np.array([is_val, ts_val, fs_val])))

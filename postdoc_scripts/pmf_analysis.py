@@ -109,11 +109,10 @@ def calculate_pmf(x, y, std_dev):
             y_fit = y_left[:n_points]
             coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
             roots = np.roots(coeffs)
-            # Consider only real roots less than ts_val
+            # Consider only roots less than ts_val and less than the minimum fitted x value
             real_roots = roots[np.isreal(roots)].real
-            candidates = real_roots[real_roots < ts_val]
+            candidates = real_roots[(real_roots < ts_val) & (real_roots < x_fit[0])]
             if len(candidates) > 0:
-                # Choose the candidate closest to ts_val
                 is_val = candidates[np.argmin(np.abs(ts_val - candidates))]
 
     if fs_val is None:
@@ -128,7 +127,8 @@ def calculate_pmf(x, y, std_dev):
             coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
             roots = np.roots(coeffs)
             real_roots = roots[np.isreal(roots)].real
-            candidates = real_roots[real_roots > ts_val]
+            # Consider only roots greater than ts_val and greater than the maximum fitted x value
+            candidates = real_roots[(real_roots > ts_val) & (real_roots > x_fit[-1])]
             if len(candidates) > 0:
                 fs_val = candidates[np.argmin(np.abs(candidates - ts_val))]
 

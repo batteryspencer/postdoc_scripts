@@ -140,6 +140,15 @@ def main():
     plt.ylabel('Frequency')
     plt.title('Histogram of Force Values')
     plt.savefig('force_histogram.png', dpi=300)
+    
+    # Plot force values along trajectory frames
+    plt.figure()
+    plt.plot(range(len(lambda_values_per_cv)), lambda_values_per_cv, label='Force vs Frame')
+    plt.xlabel('Frame Index')
+    plt.ylabel('Force (eV/Å)')
+    plt.title('Force Values Along Trajectory')
+    plt.tight_layout()
+    plt.savefig('force_vs_frame.png', dpi=300)
 
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
     cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
@@ -176,7 +185,7 @@ def main():
     plt.ylabel('Force (Arbitrary Units)')
     plt.title('Cumulative Analysis of Mean Force Over Simulation Intervals')
     plt.legend()
-    plt.savefig('cumulative_force_stats.png', dpi=100)  # Updated file name for clarity
+    plt.savefig('cumulative_force_stats.png', dpi=300)
 
 if __name__ == "__main__":
     main()

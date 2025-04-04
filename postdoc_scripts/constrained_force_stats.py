@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
+from scipy.signal import savgol_filter, find_peaks
 
 def get_file_line_count(filename):
     with open(filename) as f:
@@ -76,6 +77,38 @@ def cumulative_force_analysis(force_values):
 
     return cumulative_intervals, cumulative_means, cumulative_stds
 
+def find_histogram_peaks(data, bins=100):
+    """Find significant peaks in histogram using smoothing and peak detection."""
+    # Calculate histogram
+    hist, bin_edges = np.histogram(data, bins=bins)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    
+    # Smooth the histogram using Savitzky-Golay filter
+    window_length = 11  # Must be odd number
+    hist_smooth = savgol_filter(hist, window_length, 3)  # polynomial order 3
+    
+    # Find peaks with minimum requirements
+    peaks, _ = find_peaks(hist_smooth, 
+                         height=np.max(hist_smooth) * 0.1,  # Minimum height threshold
+                         distance=10,  # Minimum distance between peaks
+                         prominence=np.max(hist_smooth) * 0.05)  # Minimum prominence
+    
+    # Create list of (force, frequency) tuples for significant peaks
+    peak_list = [(bin_centers[peak], hist[peak]) for peak in peaks]
+    peak_list.sort(key=lambda x: x[1], reverse=True)  # Sort by height
+    
+    return peak_list
+
+def find_closest_frames(force_values, peak_forces, tolerance=0.1):
+    """Find frame indices where force values are closest to peak forces."""
+    peak_frames = {}
+    for peak_force in peak_forces:
+        # Find all forces within tolerance of the peak
+        close_indices = [i for i, force in enumerate(force_values) 
+                        if abs(force - peak_force) <= tolerance]
+        peak_frames[peak_force] = close_indices[:5]  # Store up to 5 closest frames
+    return peak_frames
+
 def main():
     constraint_index = 0  # Specify the index of the constraint of interest
     num_constraints = get_file_line_count('ICONST')
@@ -101,9 +134,21 @@ def main():
             total_md_steps += md_steps  # Accumulate total MD steps here
     
     lambda_values_per_cv = all_lambda_values[constraint_index::num_constraints]
+    # Generate a histogram of the lambda values
+    plt.hist(lambda_values_per_cv, bins=100, edgecolor='black')
+    plt.xlabel('Force (eV/Å)')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of Force Values')
+    plt.savefig('force_histogram.png', dpi=300)
+
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
     cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
-    
+    histogram_peaks = find_histogram_peaks(lambda_values_per_cv)
+
+    # Find frames corresponding to peaks
+    peak_forces = [peak[0] for peak in histogram_peaks]
+    peak_frames = find_closest_frames(lambda_values_per_cv, peak_forces)
+
     with open('force_stats_report.txt', 'w') as output_file:
         output_file.write(f'Integrating over Reaction Coordinate Index: {constraint_index}, with a total of {num_constraints} constraints\n')
         output_file.write(f'CV: {all_cv_values[0]:.2f}\n')
@@ -116,6 +161,14 @@ def main():
         output_file.write(f"{'Interval':>10}{'Cumulative Mean':>20}{'Cumulative Std':>20}\n")
         for interval, mean, std in zip(cumulative_intervals, cumulative_means, cumulative_stds):
             output_file.write(f"{interval:>10}{mean:>20.2f}{std:>20.2f}\n")
+
+        # Write histogram peak information with corresponding frames
+        output_file.write("\nHistogram Peaks (Force, Frequency, Reference Frames):\n")
+        for i, (force, frequency) in enumerate(histogram_peaks, 1):
+            frames = peak_frames[force]
+            frame_str = ", ".join(f"{frame}" for frame in frames)
+            output_file.write(f"Peak {i}: Force = {force:.2f}, Frequency = {frequency:.0f}\n")
+            output_file.write(f"   Reference Frames: {frame_str}\n")
 
     plt.figure()
     plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, capsize=4, fmt='o-', label='Cumulative Mean Force')

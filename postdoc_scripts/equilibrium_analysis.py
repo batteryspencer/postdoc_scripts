@@ -334,9 +334,19 @@ def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=Non
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(filename)
 
-def plot_autocorrelation(values, ylabel):
+def estimate_autocorrelation_time(acf, timestep=1):
+    """
+    Estimate the intrinsic fluctuation timescale as the lag (in time units) 
+    at which the autocorrelation decays to 1/e.
+    """
+    threshold = 1 / np.e
+    indices_below = np.where(acf < threshold)[0]
+    if len(indices_below) == 0:
+        return len(acf) * timestep
+    return indices_below[0] * timestep
+
+def plot_autocorrelation(values, ylabel, timestep_fs):
     plt.figure(figsize=(10, 6))
-    acf = autocorrelation(values)
     steps = range(len(acf))
     plt.plot(steps, acf, label='Autocorrelation')
     plt.axhline(0.0, color='r', linestyle='dashed', linewidth=1)
@@ -403,6 +413,13 @@ def main():
     plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
     window_sizes = [500, 1500, 2500]
     test_energy_stability(total_energies, window_sizes, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png')
+
+    acf = autocorrelation(total_energies)
+    correlation_time = estimate_autocorrelation_time(acf, timestep_fs)
+
+    # Write the window size stability analysis to the report file
+    with open('equilibrium_analysis_report.txt', 'a') as file:
+        file.write(f"\n\nEnergy Correlation Time: {correlation_time:.2f} fs\n")
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')

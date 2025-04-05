@@ -177,8 +177,14 @@ def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_
 
     stability_results = {}
 
-    # Create the main plot
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    # Create a figure with two subplots: one for raw data and one for moving average data
+    fig, (ax_raw, ax_moving) = plt.subplots(2, 1, figsize=(10, 12), sharex=True)
+
+    # Plot the raw energy data in the top subplot
+    ax_raw.plot(np.arange(len(values)) * timestep_fs / PS_TO_FS, values, color='gray', alpha=0.7)
+    ax_raw.set_ylabel('Internal Energy (eV)', fontsize=LABEL_FONTSIZE)
+    ax_raw.set_title('Raw Energy Data', fontsize=TITLE_FONTSIZE)
+    ax_raw.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 
     # Color palette generation for any length of window_sizes
     colors = plt.cm.Dark2(np.linspace(0, 1, len(window_sizes)))
@@ -214,27 +220,17 @@ def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_
                        f"Mean: {mean_energy:.2f} eV, Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)\n")
 
         # Plot the rolling mean
-        ax1.plot(np.arange(len(filtered_rolling_mean)) * timestep_fs, filtered_rolling_mean,
-                 label=f'{window_size / steps_per_ps:.1f} ps', linewidth=2, color=colors[idx])
+        ax_moving.plot(np.arange(len(filtered_rolling_mean)) * timestep_fs / PS_TO_FS, filtered_rolling_mean,
+                       label=f'{window_size / steps_per_ps:.1f} ps', linewidth=2, color=colors[idx])
 
     # Main axis formatting
-    ax1.set_xlabel('Time Step (fs)', fontsize=LABEL_FONTSIZE)
-    ax1.set_ylabel(ylabel, fontsize=LABEL_FONTSIZE)
-    ax1.legend(fontsize=LEGEND_FONTSIZE)
-    ax1.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    ax_moving.set_xlabel('Time Step (ps)', fontsize=LABEL_FONTSIZE)
+    ax_moving.set_ylabel(ylabel, fontsize=LABEL_FONTSIZE)
+    ax_moving.set_title('Moving Average Data', fontsize=TITLE_FONTSIZE)
+    ax_moving.legend(fontsize=LEGEND_FONTSIZE)
+    ax_moving.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 
-    # Create a secondary y-axis for raw data
-    ax2 = ax1.twinx()
-    ax2.plot(np.arange(len(values)) * timestep_fs, values, color='gray', alpha=0.7)
-    ax2.set_ylabel('Internal Energy (eV)', fontsize=LABEL_FONTSIZE)
-    ax2.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
-
-    # Expand the y-axis limits for the secondary y-axis
-    ylim = ax2.get_ylim()
-    ylim_diff = ylim[1] - ylim[0]
-    mean_value = np.mean(values[last_few_steps:])
-    ax2.set_ylim(mean_value - 0.6 * ylim_diff, mean_value + 0.6 * ylim_diff)
-
+    plt.tight_layout()
     plt.savefig(file_name)
     return None
 
@@ -419,7 +415,7 @@ def main():
 
     # Write the window size stability analysis to the report file
     with open('equilibrium_analysis_report.txt', 'a') as file:
-        file.write(f"\n\nEnergy Correlation Time: {correlation_time:.2f} fs\n")
+        file.write(f"\nEnergy Correlation Time: {correlation_time:.2f} fs\n")
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')

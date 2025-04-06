@@ -14,6 +14,7 @@ TICK_LABELSIZE = 14
 LEGEND_FONTSIZE = 14
 TICK_LENGTH_MAJOR = 8
 TICK_WIDTH_MAJOR = 1
+PS_TO_FS = 1000  # Conversion factor from picoseconds to femtoseconds
 
 def read_energies_from_oszicar(file_path):
     energies = []

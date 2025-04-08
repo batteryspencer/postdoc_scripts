@@ -18,39 +18,66 @@ MAX_POINTS_FOR_FIT = 5
 POLY_ORDER = 3
 
 # This function reads the force_stats_report.txt and extracts the values
-def read_force_stats(file_path, target_steps=None):
+def read_force_stats(file_path):
+    """
+    Reads the force stats report text file and extracts the CV value as well as cumulative analysis results.
+    Returns a dictionary with:
+      'CV': the CV value
+      'cumulative_data': a list of tuples (interval, cumulative mean, cumulative std)
+    """
+    cumulative_data = []
+    cv_value = None
     with open(file_path, 'r') as file:
         lines = file.readlines()
-        stats = {}
-        
-        # Parse initial values
-        if len(lines) > 2:
-            stats['CV'] = float(lines[1].split(':')[1].strip())
-            if target_steps is None:
-                stats['Mean Force'] = -1 * np.around(float(lines[2].split(':')[1].strip()), 2)
-                stats['Standard Deviation'] = float(lines[3].split(':')[1].strip())
-                stats['MD steps'] = int(lines[4].split(':')[1].strip())
 
-            # Parse cumulative analysis results
-            for line in lines[6:]:  # Assuming the Cumulative Analysis starts at line 7
-                parts = line.split()
-                if len(parts) == 3 and int(parts[0]) == target_steps:
-                    stats['Mean Force'] = -1 * float(parts[1])
-                    stats['Standard Deviation'] = float(parts[2])
-                    stats['MD steps'] = target_steps
+    # Read the CV value from the file (search for the line containing 'CV:')
+    for line in lines:
+        if 'CV:' in line:
+            cv_value = float(line.split('CV:')[1].strip())
+            break
+    if cv_value is None:
+        raise ValueError("CV value not found in file, but it is expected to always be available.")
 
-        return stats
+    # Find the section containing "Cumulative Analysis Results:"
+    start_index = None
+    for i, line in enumerate(lines):
+        if "Cumulative Analysis Results:" in line:
+            start_index = i
+            break
 
-def process_data(target_steps=None):
-    data = {'Constrained_Bond_Length (Å)': [], 'Mean_Force (eV/Å)': [], 'Standard_Deviation (eV/Å)': [], 'MD_Steps': []}
+    if start_index is not None:
+        # Process lines following the header
+        for line in lines[start_index+1:]:
+            parts = line.split()
+            if not parts:
+                continue
+            try:
+                interval = int(parts[0])
+                cum_mean = float(parts[1])
+                cum_std = float(parts[2])
+                cumulative_data.append((interval, cum_mean, cum_std))
+            except (ValueError, IndexError):
+                continue
+
+    return {"CV": cv_value, "cumulative_data": cumulative_data}
+
+def process_data():
+    data = {
+        'Constrained_Bond_Length (Å)': [],
+        'Mean_Force (eV/Å)': [],
+        'Standard_Deviation (eV/Å)': []
+    }
     for folder in glob.glob("[0-9].[0-9][0-9]_*"):
         file_path = os.path.join(folder, 'force_stats_report.txt')
         if os.path.isfile(file_path):
-            stats = read_force_stats(file_path, target_steps=target_steps)
-            data['Constrained_Bond_Length (Å)'].append(stats['CV'])
-            data['Mean_Force (eV/Å)'].append(stats['Mean Force'])
-            data['Standard_Deviation (eV/Å)'].append(stats['Standard Deviation'])
-            data['MD_Steps'].append(stats['MD steps'])
+            file_stats = read_force_stats(file_path)
+            cv_val = file_stats.get("CV")
+            cumulative_data = file_stats.get("cumulative_data", [])
+            # For each cumulative analysis row, use the CV value for the bond length and invert the sign of the mean force
+            for _, cum_mean, cum_std in cumulative_data:
+                data['Constrained_Bond_Length (Å)'].append(cv_val)
+                data['Mean_Force (eV/Å)'].append(-1 * np.around(cum_mean, 2))
+                data['Standard_Deviation (eV/Å)'].append(cum_std)
     df = pd.DataFrame(data).sort_values(by=['Constrained_Bond_Length (Å)'])
     return df
 
@@ -275,9 +302,7 @@ def plot_pmf(results, x, y, std_dev, annotate=True, color_scheme="presentation")
     plt.savefig('pmf_curve.png', dpi=300, bbox_inches='tight')
 
 def main():
-    # target_steps=None will use the data until the last step of the simulation.
-    # target_steps=np.arange(500, 10500, 500) will use the specified steps.
-    df = process_data(target_steps=None)
+    df = process_data()
     x = df['Constrained_Bond_Length (Å)'].to_numpy()
     y = df['Mean_Force (eV/Å)'].to_numpy()
     std_dev = df['Standard_Deviation (eV/Å)'].to_numpy()

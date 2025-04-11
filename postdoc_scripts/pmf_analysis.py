@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy.polynomial.polynomial as poly
-from scipy.integrate import simps
+from scipy.integrate import simpson
 
 # Define font sizes and tick parameters as constants
 LABEL_FONTSIZE = 18
@@ -213,13 +213,13 @@ def calculate_pmf(x, y, std_dev):
 
     # Integrate force (using Simpson's rule) to estimate free energy barriers
     # Forward barrier: from IS to TS
-    forward_barrier = abs(-simps(y_sorted[idx_is:idx_ts + 1], x_sorted[idx_is:idx_ts + 1]))
-    forward_variance = simps((std_sorted[idx_is:idx_ts + 1])**2, x_sorted[idx_is:idx_ts + 1])
+    forward_barrier = abs(-simpson(y_sorted[idx_is:idx_ts + 1], x=x_sorted[idx_is:idx_ts + 1]))
+    forward_variance = simpson((std_sorted[idx_is:idx_ts + 1])**2, x=x_sorted[idx_is:idx_ts + 1])
     forward_std = np.sqrt(forward_variance)
     
     # Backward barrier: from TS to FS
-    backward_barrier = abs(-simps(y_sorted[idx_ts:idx_fs + 1], x_sorted[idx_ts:idx_fs + 1]))
-    backward_variance = simps((std_sorted[idx_ts:idx_fs + 1])**2, x_sorted[idx_ts:idx_fs + 1])
+    backward_barrier = abs(-simpson(y_sorted[idx_ts:idx_fs + 1], x=x_sorted[idx_ts:idx_fs + 1]))
+    backward_variance = simpson((std_sorted[idx_ts:idx_fs + 1])**2, x=x_sorted[idx_ts:idx_fs + 1])
     backward_std = np.sqrt(backward_variance)
 
     # Compute free energy of reaction (ΔG) and its uncertainty from IS to FS
@@ -227,8 +227,8 @@ def calculate_pmf(x, y, std_dev):
     # Note: The negative sign is used to convert from force to free energy
     # The integral of the force gives the change in free energy
     # between the initial and final states.
-    delta_G = -simps(y_sorted[idx_is:idx_fs + 1], x_sorted[idx_is:idx_fs + 1])
-    delta_G_var = simps((std_sorted[idx_is:idx_fs + 1])**2, x_sorted[idx_is:idx_fs + 1])
+    delta_G = -simpson(y_sorted[idx_is:idx_fs + 1], x=x_sorted[idx_is:idx_fs + 1])
+    delta_G_var = simpson((std_sorted[idx_is:idx_fs + 1])**2, x=x_sorted[idx_is:idx_fs + 1])
     delta_G_std = np.sqrt(delta_G_var)
 
     return {

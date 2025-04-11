@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from glob import glob
 from scipy.signal import savgol_filter, find_peaks
 
+PS_TO_FS = 1000  # Conversion factor from picoseconds to femtoseconds
+
 def get_file_line_count(filename):
     with open(filename) as f:
         for i, l in enumerate(f):
@@ -115,8 +117,7 @@ def main():
     total_md_steps = 0  # Initialize total MD steps accumulator
     max_steps = None  # Specify the maximum number of steps to consider for analysis
 
-    with open("INCAR", "r") as file:
-        time_step = float(next((line.split('=')[1].strip() for line in file if "POTIM" in line), None))
+    timestep_fs = float([line.split('=')[-1].strip() for line in open('INCAR') if 'POTIM' in line][0])
 
     folders = sorted(glob('seg*'))
     if len(folders) == 0:  # Check if there are any folders to analyze
@@ -143,8 +144,8 @@ def main():
     
     # Plot force values along trajectory frames
     plt.figure()
-    plt.plot(range(len(lambda_values_per_cv)), lambda_values_per_cv, label='Force vs Frame')
-    plt.xlabel('Frame Index')
+    plt.plot(np.arange(len(lambda_values_per_cv)) * timestep_fs / PS_TO_FS, lambda_values_per_cv, label='Force vs Frame')
+    plt.xlabel('Simulation Time (ps)')
     plt.ylabel('Force (eV/Å)')
     plt.title('Force Values Along Trajectory')
     plt.tight_layout()
@@ -180,8 +181,8 @@ def main():
             output_file.write(f"   Reference Frames: {frame_str}\n")
 
     plt.figure()
-    plt.errorbar(cumulative_intervals, cumulative_means, yerr=cumulative_stds, capsize=4, fmt='o-', label='Cumulative Mean Force')
-    plt.xlabel('Simulation Interval (Number of Data Points)')
+    plt.errorbar(np.array(cumulative_intervals) * timestep_fs / PS_TO_FS, cumulative_means, yerr=cumulative_stds, capsize=4, fmt='o-', label='Cumulative Mean Force')
+    plt.xlabel('Simulation Time (ps)')
     plt.ylabel('Force (Arbitrary Units)')
     plt.title('Cumulative Analysis of Mean Force Over Simulation Intervals')
     plt.legend()

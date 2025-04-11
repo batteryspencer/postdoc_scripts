@@ -79,7 +79,8 @@ def process_data():
     data = {
         'Constrained_Bond_Length (Å)': [],
         'Mean_Force (eV/Å)': [],
-        'Standard_Deviation (eV/Å)': []
+        'Standard_Deviation (eV/Å)': [],
+        'MD_steps': [],
     }
     for folder in glob.glob("[0-9].[0-9][0-9]_*"):
         file_path = os.path.join(folder, 'force_stats_report.txt')
@@ -88,6 +89,7 @@ def process_data():
             data['Constrained_Bond_Length (Å)'].append(file_stats.get("CV"))
             data['Mean_Force (eV/Å)'].append(file_stats.get("Mean Force"))
             data['Standard_Deviation (eV/Å)'].append(file_stats.get("Standard Deviation"))
+            data['MD_steps'].append(file_stats.get("MD steps"))
     df = pd.DataFrame(data).sort_values(by=['Constrained_Bond_Length (Å)'])
     return df
 

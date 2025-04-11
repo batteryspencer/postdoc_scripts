@@ -23,20 +23,28 @@ def read_force_stats(file_path):
     Reads the force stats report text file and extracts the CV value as well as cumulative analysis results.
     Returns a dictionary with:
       'CV': the CV value
+      'Mean Force': the mean force value
+      'Standard Deviation': the standard deviation value
+      'MD steps': the number of MD steps
       'cumulative_data': a list of tuples (interval, cumulative mean, cumulative std)
     """
     cumulative_data = []
     cv_value = None
+    mean_force = None
+    std_dev = None
+    md_steps = None
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
-    # Read the CV value from the file (search for the line containing 'CV:')
     for line in lines:
         if 'CV:' in line:
             cv_value = float(line.split('CV:')[1].strip())
-            break
-    if cv_value is None:
-        raise ValueError("CV value not found in file, but it is expected to always be available.")
+        elif 'Mean Force:' in line:
+            mean_force = -1 * float(line.split('Mean Force:')[1].strip())
+        elif 'Standard Deviation:' in line:
+            std_dev = float(line.split('Standard Deviation:')[1].strip())
+        elif 'MD steps:' in line:
+            md_steps = int(line.split('MD steps:')[1].strip())
 
     # Find the section containing "Cumulative Analysis Results:"
     start_index = None
@@ -59,7 +67,13 @@ def read_force_stats(file_path):
             except (ValueError, IndexError):
                 continue
 
-    return {"CV": cv_value, "cumulative_data": cumulative_data}
+    return {
+        "CV": cv_value,
+        "Mean Force": mean_force,
+        "Standard Deviation": std_dev,
+        "MD steps": md_steps,
+        "cumulative_data": cumulative_data
+    }
 
 def process_data():
     data = {
@@ -71,13 +85,9 @@ def process_data():
         file_path = os.path.join(folder, 'force_stats_report.txt')
         if os.path.isfile(file_path):
             file_stats = read_force_stats(file_path)
-            cv_val = file_stats.get("CV")
-            cumulative_data = file_stats.get("cumulative_data", [])
-            # For each cumulative analysis row, use the CV value for the bond length and invert the sign of the mean force
-            for _, cum_mean, cum_std in cumulative_data:
-                data['Constrained_Bond_Length (Å)'].append(cv_val)
-                data['Mean_Force (eV/Å)'].append(-1 * np.around(cum_mean, 2))
-                data['Standard_Deviation (eV/Å)'].append(cum_std)
+            data['Constrained_Bond_Length (Å)'].append(file_stats.get("CV"))
+            data['Mean_Force (eV/Å)'].append(file_stats.get("Mean Force"))
+            data['Standard_Deviation (eV/Å)'].append(file_stats.get("Standard Deviation"))
     df = pd.DataFrame(data).sort_values(by=['Constrained_Bond_Length (Å)'])
     return df
 

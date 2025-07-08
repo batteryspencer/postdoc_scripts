@@ -344,6 +344,7 @@ def estimate_autocorrelation_time(acf, timestep=1):
 
 def plot_autocorrelation(values, ylabel, timestep_fs):
     plt.figure(figsize=(10, 6))
+    acf = autocorrelation(values)
     steps = range(len(acf))
     plt.plot(steps, acf, label='Autocorrelation')
     plt.axhline(0.0, color='r', linestyle='dashed', linewidth=1)

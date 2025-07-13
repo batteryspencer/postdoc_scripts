@@ -22,6 +22,11 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 
+# Workaround for cross-environment pickle compatibility (numpy._core alias)
+import numpy as _np
+import sys as _sys
+_sys.modules['numpy._core'] = _np.core
+
 # Define font sizes and tick parameters as constants
 LABEL_FONTSIZE = 18
 TITLE_FONTSIZE = 20
@@ -121,7 +126,62 @@ def main():
         df['time_ps'] = df['frame'] / PS_TO_FS
 
     # Compute only long moving average
-    df['hbonds_ma_long'] = df['n_hbonds'].rolling(window=LONG_MA_WINDOW, center=True).mean()
+    df['hbonds_ma_long'] = df['n_hbonds'].rolling(window=LONG_MA_WINDOW).mean()
+
+    # Import energy MA data and compute H-bond MA for correlation
+    energy_df = pd.read_csv("moving_average_3000_steps.csv")
+    # Compute H-bond moving average with window = 3000 frames
+    df['hbonds_ma_3000'] = df['n_hbonds'].rolling(window=3000).mean()
+    # Keep only rows where H-bond MA actually changed
+    df_hb = df.loc[df['hbonds_ma_3000'].diff().abs() > 1e-6]
+
+    # Merge the two MA series on nearest time_ps
+    ma_merge = pd.merge_asof(
+        energy_df.sort_values('time_ps'),
+        df_hb[['time_ps', 'hbonds_ma_3000']].sort_values('time_ps'),
+        on='time_ps', direction='nearest', tolerance=0.0005  # 0.5 fs guard
+    )
+    # Drop any rows where either MA is NaN
+    ma_merge = ma_merge.dropna(subset=['hbonds_ma_3000', 'moving_average_energy_eV'])
+    # Perform linear regression fit
+    from scipy.stats import linregress
+    slope, intercept, r_value, p_value, std_err = linregress(
+        ma_merge['hbonds_ma_3000'], ma_merge['moving_average_energy_eV']
+    )
+    # Correlation scatter with styled plot
+    plt.figure(figsize=(7.5, 5))
+    ax = plt.gca()
+    ax.grid(True, ls='--', lw=0.5, alpha=0.6)
+
+    # Scatter plot of down-sampled data
+    ax.scatter(
+        ma_merge['hbonds_ma_3000'][::10],
+        ma_merge['moving_average_energy_eV'][::10],
+        s=6,
+        alpha=0.6,
+        edgecolors='none',
+        label='Data'
+    )
+
+    # Regression line
+    x_line = np.array([ma_merge['hbonds_ma_3000'].min(),
+                    ma_merge['hbonds_ma_3000'].max()])
+    ax.plot(x_line, intercept + slope * x_line,
+            color='C3', lw=2,
+            label=f"Slope = {slope:.3f} eV/bond\n$R^2$ = {r_value**2:.2f}")
+
+    # Labels
+    ax.set_xlabel("H-bonds MA (3000 frames)", fontsize=14)
+    ax.set_ylabel("Energy MA (3000 frames) / eV", fontsize=14)
+    ax.set_title("Energy vs H-bond Correlation", fontsize=16)
+    ax.tick_params(axis='both', labelsize=11)
+
+    # Legend outside
+    ax.legend(fontsize=11, frameon=False,
+            loc='lower left')
+
+    plt.tight_layout()
+    plt.savefig("energy_vs_hbonds_correlation.png", dpi=300, bbox_inches='tight')
 
     # Save computed H-bond data to cache
     with open(cache_file, "wb") as f:

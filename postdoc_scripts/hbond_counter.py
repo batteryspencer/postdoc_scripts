@@ -18,6 +18,8 @@ from ase.io import read
 import numpy as np
 from ase.neighborlist import NeighborList
 import pandas as pd
+import os
+import pickle
 import matplotlib.pyplot as plt
 
 # Define font sizes and tick parameters as constants
@@ -41,74 +43,90 @@ def main():
     # Output log file
     log_file = open("hbond_output_log.txt", "w")
 
-    max_angles_all = []  # collect max O–H⋯O angle per donor H (distance-based only)
+    # Cache settings for H-bond analysis (specific to angle cutoff)
+    cache_file = f"hbond_cache_acut_{acut}.pkl"
+    if os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            data = pickle.load(f)
+        df = data["df"]
+        max_angles_all = data["max_angles_all"]
+        print("Loaded cached H-bond data", file=log_file)
+    else:
+        # Prepare to compute H-bond data
+        max_angles_all = []  # collect max O–H⋯O angle per donor H (distance-based only)
 
-    # Load initial structure to get atom types
-    initial = read(poscar)
-    symbols = initial.get_chemical_symbols()
-    # Identify indices for oxygens and hydrogens
-    oxy_idx = [i for i, el in enumerate(symbols) if el == "O"]
-    hyd_idx = [i for i, el in enumerate(symbols) if el == "H"]
-    # Number of water molecules (one donor O per water)
-    n_water = len(oxy_idx)
+    if not (os.path.exists(cache_file)):
+        # Load initial structure to get atom types
+        initial = read(poscar)
+        symbols = initial.get_chemical_symbols()
+        # Identify indices for oxygens and hydrogens
+        oxy_idx = [i for i, el in enumerate(symbols) if el == "O"]
+        hyd_idx = [i for i, el in enumerate(symbols) if el == "H"]
+        # Number of water molecules (one donor O per water)
+        n_water = len(oxy_idx)
 
-    # Prepare cutoffs for ASE neighbor lists (PBC-aware)
-    cutoffs_oh = [oh_bond_cut if el == "O" else 0.0 for el in symbols]
-    cutoffs_acc = [dcut if el == "O" else 0.0 for el in symbols]
+        # Prepare cutoffs for ASE neighbor lists (PBC-aware)
+        cutoffs_oh = [oh_bond_cut if el == "O" else 0.0 for el in symbols]
+        cutoffs_acc = [dcut if el == "O" else 0.0 for el in symbols]
 
-    # Read VASP XDATCAR trajectory using ASE VASP reader
-    traj = read(xdatcar, index=":", format="vasp-xdatcar")
-    hb_counts = []
+        # Read VASP XDATCAR trajectory using ASE VASP reader
+        traj = read(xdatcar, index=":", format="vasp-xdatcar")
+        hb_counts = []
 
-    for atoms in traj:
-        atoms.set_pbc([True, True, True])
-        cell = atoms.get_cell()
-        # Build neighbor lists for OH donors and O acceptors
-        nl_oh = NeighborList(cutoffs_oh, bothways=True, self_interaction=False)
-        nl_oh.update(atoms)
-        nl_acc = NeighborList(cutoffs_acc, bothways=True, self_interaction=False)
-        nl_acc.update(atoms)
+        for atoms in traj:
+            atoms.set_pbc([True, True, True])
+            cell = atoms.get_cell()
+            # Build neighbor lists for OH donors and O acceptors
+            nl_oh = NeighborList(cutoffs_oh, bothways=True, self_interaction=False)
+            nl_oh.update(atoms)
+            nl_acc = NeighborList(cutoffs_acc, bothways=True, self_interaction=False)
+            nl_acc.update(atoms)
 
-        count = 0
-        # For each frame, we will track max angle per donor H
-        for idxO in oxy_idx:
-            h_nbrs, h_shifts = nl_oh.get_neighbors(idxO)
-            for h_idx, h_shift in zip(h_nbrs, h_shifts):
-                if h_idx not in hyd_idx:
-                    continue
-                pos_O = atoms.positions[idxO]
-                pos_H = atoms.positions[h_idx] + np.dot(h_shift, cell)
-                # Gather all angles for this donor H
-                h_angles = []
-                o_nbrs, o_shifts = nl_acc.get_neighbors(h_idx)
-                for o_idx, o_shift in zip(o_nbrs, o_shifts):
-                    if o_idx not in oxy_idx or o_idx == idxO:
+            count = 0
+            # For each frame, we will track max angle per donor H
+            for idxO in oxy_idx:
+                h_nbrs, h_shifts = nl_oh.get_neighbors(idxO)
+                for h_idx, h_shift in zip(h_nbrs, h_shifts):
+                    if h_idx not in hyd_idx:
                         continue
-                    pos_O2 = atoms.positions[o_idx] + np.dot(o_shift, cell)
-                    v1 = pos_O - pos_H
-                    v2 = pos_O2 - pos_H
-                    angle = np.degrees(
-                        np.arccos(
-                            np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+                    pos_O = atoms.positions[idxO]
+                    pos_H = atoms.positions[h_idx] + np.dot(h_shift, cell)
+                    # Gather all angles for this donor H
+                    h_angles = []
+                    o_nbrs, o_shifts = nl_acc.get_neighbors(h_idx)
+                    for o_idx, o_shift in zip(o_nbrs, o_shifts):
+                        if o_idx not in oxy_idx or o_idx == idxO:
+                            continue
+                        pos_O2 = atoms.positions[o_idx] + np.dot(o_shift, cell)
+                        v1 = pos_O - pos_H
+                        v2 = pos_O2 - pos_H
+                        angle = np.degrees(
+                            np.arccos(
+                                np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+                            )
                         )
-                    )
-                    h_angles.append(angle)
-                # After checking all neighbors, record the maximum angle found (if any)
-                if h_angles:
-                    max_angle = max(h_angles)
-                    max_angles_all.append(max_angle)
-                    # Count an H-bond if the most linear angle passes the cutoff
-                    if max_angle > (180 - acut):
-                        count += 1
-        hb_counts.append(count)
+                        h_angles.append(angle)
+                    # After checking all neighbors, record the maximum angle found (if any)
+                    if h_angles:
+                        max_angle = max(h_angles)
+                        max_angles_all.append(max_angle)
+                        # Count an H-bond if the most linear angle passes the cutoff
+                        if max_angle > (180 - acut):
+                            count += 1
+            hb_counts.append(count)
 
-    # Save results
-    df = pd.DataFrame({"frame": range(len(hb_counts)), "n_hbonds": hb_counts})
-    # Convert frame index to time in ps and compute moving average
-    df['time_ps'] = df['frame'] / PS_TO_FS
+        # Save results
+        df = pd.DataFrame({"frame": range(len(hb_counts)), "n_hbonds": hb_counts})
+        # Convert frame index to time in ps and compute moving average
+        df['time_ps'] = df['frame'] / PS_TO_FS
 
     # Compute only long moving average
     df['hbonds_ma_long'] = df['n_hbonds'].rolling(window=LONG_MA_WINDOW, center=True).mean()
+
+    # Save computed H-bond data to cache
+    with open(cache_file, "wb") as f:
+        pickle.dump({"df": df, "max_angles_all": max_angles_all}, f)
+    print("Saved cached H-bond data", file=log_file)
 
     # Debug: print ranges
     print(f"Frames: {len(df)}", file=log_file)

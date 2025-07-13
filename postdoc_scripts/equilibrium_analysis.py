@@ -1,8 +1,10 @@
+from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import os
 import re
 import numpy as np
 import pandas as pd
+import json
 
 # Define the number of steps to analyze
 NUM_STEPS_TO_ANALYZE = 30000
@@ -15,6 +17,119 @@ LEGEND_FONTSIZE = 14
 TICK_LENGTH_MAJOR = 8
 TICK_WIDTH_MAJOR = 1
 PS_TO_FS = 1000  # Conversion factor from picoseconds to femtoseconds
+
+def detect_equilibration(values_series, stability_threshold, timestep_fs):
+    """
+    Determine whether the system equilibrated via block-mean overlap.
+    Returns (eq_detected: bool, equil_time_ps: float or None).
+    """
+    default_block_size = len(values_series) // 10
+    num_blocks = len(values_series) // default_block_size
+    block_means = []
+    for i in range(num_blocks):
+        blk = values_series[i*default_block_size:(i+1)*default_block_size]
+        block_means.append(blk.mean())
+    eq_block = next(
+        (i for i in range(1, len(block_means))
+         if all(abs(block_means[j] - block_means[j-1]) <= stability_threshold
+                for j in range(i, len(block_means)))),
+        None
+    )
+    if eq_block is None:
+        return False, None
+    equil_time_ps = eq_block * default_block_size * timestep_fs / PS_TO_FS
+    return True, equil_time_ps
+
+def compute_stability_metrics(production_series, window_sizes, analysis_window_ps, stability_threshold, timestep_fs):
+    """
+    Compute moving-average fluctuations and drift slope for the production series.
+    Returns a dict with keys:
+      'sigma': {window_ps: (mean, fluctuation, is_stable)},
+      'drift_slope': float,
+      'drift_r2': float,
+      'drift_stderr': float
+    """
+    metrics = {'sigma': {}}
+    # convert to ps
+    steps_per_ps = PS_TO_FS / timestep_fs
+    # Determine dynamic window length
+    production_len_ps = len(production_series) * (timestep_fs / PS_TO_FS)
+    max_window_ps = min(analysis_window_ps, production_len_ps)
+    dynamic_window_steps = int(max_window_ps * PS_TO_FS / timestep_fs)
+    # Compute σ for each moving-average window
+    for w in window_sizes:
+        window_ps = w / steps_per_ps
+        rolling_mean = production_series.rolling(window=w).mean().dropna()
+        analysis_data = rolling_mean.iloc[-dynamic_window_steps:]
+        fluctuation = analysis_data.std()
+        mean_energy = analysis_data.mean()
+        is_stable = fluctuation <= stability_threshold
+        metrics['sigma'][window_ps] = (mean_energy, fluctuation, is_stable)
+    # Compute drift slope on the moving-average curve using the first window size
+    w0 = window_sizes[0]
+    ma_curve = production_series.rolling(window=w0).mean().dropna()
+    # Convert index to time in ps
+    times_ma = ma_curve.index * (timestep_fs / PS_TO_FS)
+    drift_result = linregress(times_ma, ma_curve.values)
+    metrics['drift_slope'] = drift_result.slope
+    metrics['drift_r2'] = drift_result.rvalue**2
+    metrics['drift_stderr'] = drift_result.stderr
+    return metrics
+
+def detect_equilibration(values_series, stability_threshold, timestep_fs):
+    """
+    Determine whether the system equilibrated via block-mean overlap.
+    Returns (eq_detected: bool, equil_time_ps: float or None).
+    """
+    default_block_size = len(values_series) // 10
+    num_blocks = len(values_series) // default_block_size
+    block_means = []
+    for i in range(num_blocks):
+        blk = values_series[i*default_block_size:(i+1)*default_block_size]
+        block_means.append(blk.mean())
+    eq_block = next(
+        (i for i in range(1, len(block_means))
+         if all(abs(block_means[j] - block_means[j-1]) <= stability_threshold
+                for j in range(i, len(block_means)))),
+        None
+    )
+    if eq_block is None:
+        return False, None
+    equil_time_ps = eq_block * default_block_size * timestep_fs / PS_TO_FS
+    return True, equil_time_ps
+
+def compute_stability_metrics(production_series, window_sizes, analysis_window_ps, stability_threshold, timestep_fs):
+    """
+    Compute moving-average fluctuations and drift slope for the production series.
+    Returns a dict with keys:
+      'sigma': {window_ps: (mean, fluctuation, is_stable)},
+      'drift_slope': float,
+      'drift_r2': float,
+      'drift_stderr': float
+    """
+    metrics = {'sigma': {}}
+    # convert to ps
+    steps_per_ps = PS_TO_FS / timestep_fs
+    # Determine dynamic window length
+    production_len_ps = len(production_series) * (timestep_fs / PS_TO_FS)
+    max_window_ps = min(analysis_window_ps, production_len_ps)
+    dynamic_window_steps = int(max_window_ps * PS_TO_FS / timestep_fs)
+    # Compute σ for each moving-average window
+    for w in window_sizes:
+        window_ps = w / steps_per_ps
+        rolling_mean = production_series.rolling(window=w).mean().dropna()
+        analysis_data = rolling_mean.iloc[-dynamic_window_steps:]
+        fluctuation = analysis_data.std()
+        mean_energy = analysis_data.mean()
+        is_stable = fluctuation <= stability_threshold
+        metrics['sigma'][window_ps] = (mean_energy, fluctuation, is_stable)
+    # Compute drift slope
+    times_prod = np.arange(len(production_series)) * (timestep_fs / PS_TO_FS)
+    drift_result = linregress(times_prod, production_series.values)
+    metrics['drift_slope'] = drift_result.slope
+    metrics['drift_r2'] = drift_result.rvalue**2
+    metrics['drift_stderr'] = drift_result.stderr
+    return metrics
 
 def read_energies_from_oszicar(file_path):
     energies = []
@@ -37,20 +152,22 @@ def read_energies_from_oszicar(file_path):
 
 def extract_total_energies(file_path):
     total_energies = []
+    e0_pending = None
 
     with open(file_path, 'r') as file:
         for line in file:
-            if 'free  energy' in line:
-                dft_energy = float(re.search(r'[-+]?\d*\.\d+|\d+', line).group())
-            elif 'kinetic energy EKIN' in line:
-                kinetic_energy = float(re.search(r'[-+]?\d*\.\d+|\d+', line).group())
-
-                # Check if both energies are extracted
-                if dft_energy is not None and kinetic_energy is not None:
-                    total_energy = dft_energy + kinetic_energy
-                    total_energies.append(total_energy)
-                    dft_energy = None  # Reset for the next iteration
-                    kinetic_energy = None  # Reset for the next iteration
+            # Capture the "energy without entropy" (E₀)
+            if 'energy without entropy' in line:
+                # Split on '=' and take the first token after it, handle unicode dash
+                raw = line.split('=', 1)[1].strip().split()[0]
+                raw = raw.replace('–', '-')
+                e0_pending = float(raw)
+            # When EKIN appears and we have an E₀ pending, pair and reset
+            elif 'kinetic energy EKIN' in line and e0_pending is not None:
+                raw = line.split('=', 1)[1].strip().split()[0]
+                ekin = float(raw)
+                total_energies.append(e0_pending + ekin)
+                e0_pending = None
 
     return total_energies
 
@@ -167,72 +284,205 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(file_name)
 
-def test_energy_stability(values, window_sizes, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png'):
-    # Convert to a Pandas Series for easy rolling calculations
+def test_energy_stability(values, window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png'):
+    # Detect equilibration
     values_series = pd.Series(values)
+    eq_detected, equil_time_ps = detect_equilibration(values_series, stability_threshold, timestep_fs)
 
-    # Number of steps per picosecond based on the timestep (default is 1 fs per timestep)
-    steps_per_ps = 1000 / timestep_fs
-    analysis_window_steps = int(analysis_window_ps * steps_per_ps)
-    last_few_steps = -analysis_window_steps
+    # Estimate energy autocorrelation time in steps
+    acf = autocorrelation(values_series.values)
+    tau_steps = estimate_autocorrelation_time(acf, timestep=1)  # timestep in fs
+    # Write tau to report
+    with open('equilibrium_analysis_report.txt', 'a') as file:
+        file.write(f"Energy autocorrelation time: {tau_steps * timestep_fs / PS_TO_FS:.2f} ps ({tau_steps} steps)\n")
 
-    stability_results = {}
+    # Handle missing equilibration block: log, but continue to plotting with limited analysis
+    if not eq_detected:
+        print("No equilibration block found: system not equilibrated per block-overlap test.")
+        with open('equilibrium_analysis_report.txt', 'a') as file:
+            file.write("\n=== Equilibration Status ===\n")
+            file.write("Equilibration NOT detected via block-overlap test.\n")
+            file.write("Recommendation: extend simulation or review equilibration criteria.\n")
+            file.write("============================\n\n")
 
-    # Create a figure with two subplots: one for raw data and one for moving average data
-    fig, (ax_raw, ax_moving) = plt.subplots(2, 1, figsize=(10, 12), sharex=True)
+    # Guard against empty energy data
+    if values_series.empty:
+        raise ValueError("No energy data available for stability analysis.")
 
-    # Plot the raw energy data in the top subplot
+    # Define production series: limit to last 10 ps after equilibration or full post length
+    if eq_detected:
+        # Full post-equilibration series
+        start_step = int(equil_time_ps * PS_TO_FS / timestep_fs)
+        full_post = values_series.iloc[start_step:]
+        # Limit production window to last 10 ps or full post length, whichever is smaller
+        max_prod_ps = min(len(full_post) * (timestep_fs / PS_TO_FS), 10.0)
+        prod_steps = int(max_prod_ps * PS_TO_FS / timestep_fs)
+        production_series = full_post.iloc[-prod_steps:]
+        # Determine actual production start time in ps
+        prod_start_step = start_step + (len(full_post) - prod_steps)
+        prod_start_ps = prod_start_step * (timestep_fs / PS_TO_FS)
+    else:
+        production_series = values_series
+        max_prod_ps = len(production_series) * (timestep_fs / PS_TO_FS)
+
+    # Use the single window size provided
+    window_sizes = [window_size]
+    if window_size > len(production_series):
+        raise ValueError(f"window_size ({window_size}) exceeds production data length ({len(production_series)})")
+
+    # Compute stability metrics on production_series
+    metrics = compute_stability_metrics(production_series, window_sizes, analysis_window_ps, stability_threshold, timestep_fs)
+
+    # Create a figure with three subplots in a 3x1 grid: raw, moving average, cumulative mean
+    fig, (ax_raw, ax_moving, ax_cum) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+
+    # === 1: Raw energy panel ===
     ax_raw.plot(np.arange(len(values)) * timestep_fs / PS_TO_FS, values, color='gray', alpha=0.7)
     ax_raw.set_ylabel('Internal Energy (eV)', fontsize=LABEL_FONTSIZE)
     ax_raw.set_title('Raw Energy Data', fontsize=TITLE_FONTSIZE)
     ax_raw.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 
-    # Color palette generation for any length of window_sizes
+    # === 2: Moving-average panel ===
     colors = plt.cm.Dark2(np.linspace(0, 1, len(window_sizes)))
-
+    steps_per_ps = 1000 / timestep_fs
     for idx, window_size in enumerate(window_sizes):
-        # Calculate rolling mean
         rolling_mean = values_series.rolling(window=window_size).mean()
         filtered_rolling_mean = rolling_mean.dropna()
+        # Use the Series index to preserve absolute timestamps
+        times = filtered_rolling_mean.index * timestep_fs / PS_TO_FS
+        window_ps = window_size / steps_per_ps
+        ax_moving.plot(times, filtered_rolling_mean,
+                       label=f'{window_ps:.1f} ps', linewidth=2, color=colors[idx])
+        # Fill ±σ band and annotate σ only if eq_detected
+        if eq_detected:
+            mean_energy, fluctuation, stability_status = metrics['sigma'][window_ps]
+            # Shaded uncertainty band ± standard deviation
+            ax_moving.fill_between(
+                times,
+                filtered_rolling_mean - fluctuation,
+                filtered_rolling_mean + fluctuation,
+                color=colors[idx],
+                alpha=0.2
+            )
+    # Mark equilibration cutoff and annotate equil time if detected
+    if eq_detected:
+        ax_moving.axvline(equil_time_ps, color='black', linestyle='--', linewidth=1)
+        ax_moving.text(
+            equil_time_ps + 0.5,
+            ax_moving.get_ylim()[1],
+            f'Equil = {equil_time_ps:.1f} ps',
+            color='black',
+            fontsize=LEGEND_FONTSIZE,
+            rotation=90,
+            va='top'
+        )
+        # Compute window size in ps for shading offset
+        steps_per_ps = PS_TO_FS / timestep_fs
+        window_ps = window_size / steps_per_ps
+        # Use the MA curve to determine actual end of production window
+        # Use the same times variable as above (from the last window, which is the only one anyway)
+        # MA curve ends at the last available time stamp
+        ma_end_ps = times[-1]
+        # Shade the production window using the actual MA range
+        ax_moving.axvspan(
+            prod_start_ps + window_ps,
+            ma_end_ps,
+            color='gray', alpha=0.2,
+            label='Production Window'
+        )
 
-        # Focus only on the last part of the data (e.g., last 5 ps)
-        analysis_data = filtered_rolling_mean[last_few_steps:]
-        
-        # Calculate standard deviation and mean in the analysis range
-        fluctuation = analysis_data.std()
-        mean_energy = analysis_data.mean()
+        # Annotate σ inside the production window (use the first window size for annotation)
+        window_ps = window_sizes[0] / steps_per_ps
+        mean_energy, fluctuation, stability_status = metrics['sigma'][window_ps]
+        # Center the σ annotation within the shaded region
+        x_sig = (prod_start_ps + window_ps + ma_end_ps) / 2
+        y_min, y_max = ax_moving.get_ylim()
+        y_sig = y_min + 0.6 * (y_max - y_min)
+        ax_moving.text(
+            x_sig,
+            y_sig,
+            f"σ = {fluctuation:.2f} eV",
+            fontsize=LEGEND_FONTSIZE,
+            ha='center',
+            va='bottom',
+            bbox=dict(facecolor='white', alpha=0.6, edgecolor='none')
+        )
+        # Annotate absolute drift slope inside the production window
+        # Recompute y_min, y_max in case they have changed
+        y_min, y_max = ax_moving.get_ylim()
+        slope_abs = abs(metrics['drift_slope'])
+        # Place slope text just below the σ annotation
+        y_slope = y_sig - 0.05 * (y_max - y_min)
+        ax_moving.text(
+            x_sig,
+            y_slope,
+            f"|slope| = {slope_abs:.4f} eV/ps",
+            fontsize=LEGEND_FONTSIZE,
+            ha='center',
+            va='top',
+            color='#222222',
+            bbox=dict(facecolor='white', alpha=0.6, edgecolor='none')
+        )
 
-        # Stability check based on the threshold
-        stability_status = fluctuation <= stability_threshold
-        stability_results[window_size / 1000] = {
-            'fluctuation': fluctuation,
-            'mean_energy': mean_energy,
-            'is_stable': stability_status
-        }
-
-        # Print results
-        stability_status_str = "stable" if stability_status else "not stable"
-        print(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
-              f"Mean: {mean_energy:.2f} eV, Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)")
-
-        # Write the window size stability analysis to the report file
-        with open('equilibrium_analysis_report.txt', 'a') as file:
-            file.write(f"For window size {window_size / 1000:.1f} ps, energies are {stability_status_str} in the last {analysis_window_ps} ps. "
-                       f"Mean: {mean_energy:.2f} eV, Fluctuation: ±{fluctuation:.2f} eV (Threshold: ±{stability_threshold:.2f} eV)\n")
-
-        # Plot the rolling mean
-        ax_moving.plot(np.arange(len(filtered_rolling_mean)) * timestep_fs / PS_TO_FS, filtered_rolling_mean,
-                       label=f'{window_size / steps_per_ps:.1f} ps', linewidth=2, color=colors[idx])
-
-    # Main axis formatting
-    ax_moving.set_xlabel('Time Step (ps)', fontsize=LABEL_FONTSIZE)
+    ax_moving.set_xlabel('Time (ps)', fontsize=LABEL_FONTSIZE)
     ax_moving.set_ylabel(ylabel, fontsize=LABEL_FONTSIZE)
     ax_moving.set_title('Moving Average Data', fontsize=TITLE_FONTSIZE)
-    ax_moving.legend(fontsize=LEGEND_FONTSIZE)
+    ax_moving.legend(fontsize=LEGEND_FONTSIZE, loc='lower left')
     ax_moving.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+
+    # === 3: Cumulative-mean panel ===
+    cumu_mean = values_series.expanding().mean()
+    times_full = np.arange(len(values_series)) * timestep_fs / PS_TO_FS
+    ax_cum.plot(times_full, cumu_mean, color='blue', linewidth=2, label='Cumulative Mean')
+    ax_cum.set_ylabel('Cumulative Mean (eV)', fontsize=LABEL_FONTSIZE)
+    ax_cum.set_xlabel('Time (ps)', fontsize=LABEL_FONTSIZE)
+    ax_cum.set_title('Cumulative Mean Energy', fontsize=TITLE_FONTSIZE)
+    ax_cum.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
+    ax_cum.legend(fontsize=LEGEND_FONTSIZE)
 
     plt.tight_layout()
     plt.savefig(file_name)
+
+    # --------- Report writing after plotting ---------
+    if eq_detected:
+        with open('equilibrium_analysis_report.txt', 'a') as file:
+            file.write("\n=== Equilibration Status ===\n")
+            file.write(f"Equilibration detected at {equil_time_ps:.2f} ps.\n")
+            file.write(f"Production window: {max_prod_ps:.2f} ps\n")
+            file.write(f"  • Drift slope: {metrics['drift_slope']:.4g} eV/ps\n")
+            file.write(f"  • σ (3 ps MA window): {metrics['sigma'][3.0][1]:.2f} eV\n")
+            file.write("============================\n\n")
+
+    # Write machine-readable JSON report with rounded values
+    json_metrics = {
+        "energy_autocorrelation_time": {
+            "value": round(tau_steps * timestep_fs / PS_TO_FS, 3),
+            "unit": "ps"
+        },
+    }
+    if eq_detected:
+        json_metrics["equilibration_time"] = {
+            "value": round(equil_time_ps, 3),
+            "unit": "ps"
+        }
+        json_metrics["drift_slope"] = {
+            "value": round(metrics["drift_slope"], 6),
+            "unit": "eV/ps"
+        }
+        json_metrics["sigma"] = {}
+        for w, (_, fluctuation, _) in metrics["sigma"].items():
+            key = f"{w:.1f}_ps"
+            json_metrics["sigma"][key] = {
+                "value": round(fluctuation, 6),
+                "unit": "eV"
+            }
+    else:
+        json_metrics["equilibration_time"] = None
+        json_metrics["drift_slope"] = None
+        json_metrics["sigma"] = None
+
+    with open('equilibrium_analysis_report.json', 'w') as jf:
+        json.dump(json_metrics, jf, indent=2)
     return None
 
 def print_top_frequencies(frequencies, amplitudes, data_type, top_n):
@@ -409,15 +659,8 @@ def main():
     window_size = 100
     plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
     plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
-    window_sizes = [500, 1500, 2500]
-    test_energy_stability(total_energies, window_sizes, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png')
-
-    acf = autocorrelation(total_energies)
-    correlation_time = estimate_autocorrelation_time(acf, timestep_fs)
-
-    # Write the window size stability analysis to the report file
-    with open('equilibrium_analysis_report.txt', 'a') as file:
-        file.write(f"\nEnergy Correlation Time: {correlation_time:.2f} fs\n")
+    energy_window_size = 3000
+    test_energy_stability(total_energies, energy_window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png')
 
     # Plotting Fourier transform
     plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')

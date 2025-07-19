@@ -10,6 +10,9 @@ combinations = [
     (None, None, 5), (None, None, 10)
 ]
 
+# Include original (baseline) configuration without NCORE/NPAR/KPAR
+combinations.insert(0, (None, None, None))
+
 # Define the input files
 input_files = ['POSCAR', 'POTCAR', 'INCAR', 'KPOINTS', 'submit_cpu.sh']
 
@@ -49,14 +52,17 @@ def update_submit_script(script_file, ncore, npar, kpar):
     # Look for the line with #SBATCH --job-name= and modify it
     with open(script_file, 'w') as script:
         for line in lines:
-            if line.startswith('#SBATCH --job-name='):
+            if job_suffix and line.startswith('#SBATCH --job-name='):
                 line = line.strip() + f"_{job_suffix_str}\n"
             script.write(line)
 
 # Main loop to create directories and copy files
 for idx, (ncore, npar, kpar) in enumerate(combinations, start=1):
-    # Create folder name with padded number
-    folder_name = f"{idx:02d}_NCORE={ncore if ncore else 'None'}_NPAR={npar if npar else 'None'}_KPAR={kpar}"
+    # Create folder name (baseline first, then parameterized)
+    if ncore is None and npar is None and kpar is None:
+        folder_name = f"{idx:02d}_baseline"
+    else:
+        folder_name = f"{idx:02d}_NCORE={ncore}_NPAR={npar}_KPAR={kpar}"
     folder_path = os.path.join(base_dir, folder_name)
     
     # Create the directory

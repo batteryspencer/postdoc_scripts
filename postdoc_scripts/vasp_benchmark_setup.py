@@ -1,20 +1,65 @@
 import os
 import shutil
 
-# Define the combinations
-combinations = [
-    (16, 4, 5), (16, 4, 10), (16, 2, 5), (16, 2, 10),
-    (16, 8, 5), (16, 8, 10), (32, 2, 5), (32, 2, 10),
-    (32, 4, 5), (32, 4, 10), (64, 1, 5), (64, 1, 10),
-    (64, 2, 5), (64, 2, 10), (128, 1, 5), (128, 1, 10),
-    (None, None, 5), (None, None, 10)
+# # ------------------------------------------------------------------
+# # USER OPTIONS: choose which combos to include (no argparse)
+# # ------------------------------------------------------------------
+# 1) Full sweep: all (ncore, npar, kpar) that fill cores_per_node
+USE_SWEEP = False
+
+# 2) Manual combos: list of tuples (NCORE, NPAR, KPAR)
+MANUAL_COMBOS = [
+    # e.g. (16, 6, 2), (12, 8, 2)
+    (16, 6, 2), (16, 3, 4), (12, 8, 2)
 ]
 
+# 3) Load combos from a CSV with columns NCORE,NPAR,KPAR (no header row check)
+USE_TOP_CSV = False
+TOP_CSV_PATH = "top_configs.csv"
+
 # Include original (baseline) configuration without NCORE/NPAR/KPAR
-combinations.insert(0, (None, None, None))
+ADD_BASELINE = False
+
+# ------------------------------------------------------------------
+# Generate combinations based on user options
+# ------------------------------------------------------------------
+cores_per_node = 192               # --ntasks-per-node in submit.sh
+ncore_options = [4, 8, 12, 16]     # band‑parallel sizes to probe
+kpar_options = [1, 2, 4, 6]        # k‑point groups to probe
+
+combinations = []
+if USE_SWEEP:
+    for ncore in ncore_options:
+        for kpar in kpar_options:
+            if cores_per_node % (ncore * kpar) == 0:     # must divide evenly
+                npar = cores_per_node // (ncore * kpar)  # communication groups
+                combinations.append((ncore, npar, kpar))
+
+if MANUAL_COMBOS:
+    combinations.extend(MANUAL_COMBOS)
+
+if USE_TOP_CSV:
+    import csv
+    with open(TOP_CSV_PATH, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            # assume columns named NCORE, NPAR, KPAR
+            combinations.append((int(row['NCORE']), int(row['NPAR']), int(row['KPAR'])))
+
+# Deduplicate while preserving order
+seen = set()
+unique_combos = []
+for combo in combinations:
+    if combo not in seen:
+        seen.add(combo)
+        unique_combos.append(combo)
+combinations = unique_combos
+
+if ADD_BASELINE:
+    combinations.insert(0, (None, None, None))
 
 # Define the input files
-input_files = ['POSCAR', 'POTCAR', 'INCAR', 'KPOINTS', 'submit_cpu.sh']
+input_files = ['POSCAR', 'POTCAR', 'INCAR', 'KPOINTS', 'submit.sh']
 
 # Base directory where the folders will be created
 base_dir = './benchmark_folders'
@@ -33,7 +78,7 @@ def update_incar(incar_file, ncore, npar, kpar):
         if kpar is not None:
             incar.write(f"\nKPAR = {kpar}")
 
-# Function to update job name inside submit_cpu.sh
+# Function to update job name inside submit.sh
 def update_submit_script(script_file, ncore, npar, kpar):
     job_suffix = []
     if ncore is not None:
@@ -48,7 +93,7 @@ def update_submit_script(script_file, ncore, npar, kpar):
     # Modify the job name line inside the submit script
     with open(script_file, 'r') as script:
         lines = script.readlines()
-    
+
     # Look for the line with #SBATCH --job-name= and modify it
     with open(script_file, 'w') as script:
         for line in lines:
@@ -76,9 +121,8 @@ for idx, (ncore, npar, kpar) in enumerate(combinations, start=1):
     incar_path = os.path.join(folder_path, 'INCAR')
     update_incar(incar_path, ncore, npar, kpar)
     
-    # Modify submit_cpu.sh file
-    submit_script_path = os.path.join(folder_path, 'submit_cpu.sh')
+    # Modify submit.sh file
+    submit_script_path = os.path.join(folder_path, 'submit.sh')
     update_submit_script(submit_script_path, ncore, npar, kpar)
 
 print(f"All directories created and files copied successfully in {base_dir}.")
-

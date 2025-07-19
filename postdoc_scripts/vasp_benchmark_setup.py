@@ -10,7 +10,6 @@ USE_SWEEP = False
 # 2) Manual combos: list of tuples (NCORE, NPAR, KPAR)
 MANUAL_COMBOS = [
     # e.g. (16, 6, 2), (12, 8, 2)
-    (16, 6, 2), (16, 3, 4), (12, 8, 2)
 ]
 
 # 3) Load combos from a CSV with columns NCORE,NPAR,KPAR (no header row check)

@@ -92,9 +92,10 @@ def main():
     plt.tight_layout()
     plt.savefig("benchmark_plot.png", dpi=300)
 
-    # Summarize
-    print("\n===== Benchmark summary =====")
-    print(df.to_string(
+    # Summarize and save to file
+    summary_lines = []
+    summary_lines.append("===== Benchmark summary =====")
+    summary_lines.append(df.to_string(
         index=False,
         formatters={
             "NCORE": "{:.0f}".format,
@@ -110,13 +111,20 @@ def main():
     top_df = df[df["runtime_per_step_s"] <= window]
     top_df.to_csv("top_configs.csv", index=False)
 
-    print(f"\nBest performance: {best_time:.2f} s/step in folder {best['folder']}")
-    print(f"Configs within {args.top*100:.0f}% of best:")
-    print(top_df[["folder", "runtime_per_step_s"]].to_string(
-        index=False,
-        formatters={"runtime_per_step_s": "{:.2f}".format}
-    ))
-    print("\nOutputs written to: benchmark_results.csv, benchmark_plot.png, top_configs.csv")
+    summary_lines.append(f"")
+    summary_lines.append(f"Best performance: {best_time:.2f} s/step in folder {best['folder']}")
+    summary_lines.append(f"Configs within {args.top*100:.0f}% of best:")
+    summary_lines.append(top_df[["folder", "runtime_per_step_s"]]
+                         .to_string(index=False,
+                                    formatters={"runtime_per_step_s": "{:.2f}".format})
+    )
+    outputs_msg = "Outputs written to: benchmark_results.csv, benchmark_plot.png, top_configs.csv, benchmark_summary.txt"
+    summary_lines.append(outputs_msg)
+
+    summary_text = "\n".join(summary_lines)
+    print(summary_text)
+    with open("benchmark_summary.txt", "w") as f:
+        f.write(summary_text)
 
 if __name__ == "__main__":
     main()

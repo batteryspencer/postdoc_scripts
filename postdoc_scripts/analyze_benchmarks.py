@@ -2,7 +2,6 @@
 """analyze_benchmarks.py - fast VASP benchmark analyzer using bash one-liners"""
 
 import argparse
-import pathlib
 import statistics
 import sys
 
@@ -43,11 +42,27 @@ def main():
     )
     parser.add_argument("--base", default="benchmark_folders",
                         help="Directory containing benchmark subfolders")
-    parser.add_argument("--nsw", type=int, default=20,
-                        help="Number of steps per run (for per-step metric)")
     parser.add_argument("--top", type=float, default=0.1,
                         help="Fractional window around best to select top configs")
     args = parser.parse_args()
+
+    # Automatically detect NSW from INCAR in the first folder
+    first_folder = sorted(pathlib.Path(args.base).iterdir())[0]
+    incar_path = first_folder / "INCAR"
+    nsw = None
+    try:
+        with open(incar_path) as f:
+            for line in f:
+                if line.strip().startswith("NSW"):
+                    # handle formats like 'NSW = 40'
+                    parts = line.split("=")
+                    if len(parts) >= 2:
+                        nsw = int(parts[1].split()[0])
+                        break
+    except Exception:
+        pass
+    if nsw is None:
+        sys.exit(f"Error: Could not detect NSW from {incar_path}")
 
     base = pathlib.Path(args.base)
     if not base.is_dir():
@@ -70,7 +85,7 @@ def main():
             "NPAR": npar,
             "KPAR": kpar,
             "runtime_total_s": avg_time,
-            "runtime_per_step_s": avg_time / args.nsw
+            "runtime_per_step_s": avg_time / nsw
         })
 
     if not rows:
@@ -84,7 +99,7 @@ def main():
     plt.figure(figsize=(8, max(4, 0.3 * len(df_plot))))
     plt.barh(df_plot["folder"], df_plot["runtime_per_step_s"])
     plt.gca().invert_yaxis()
-    plt.xlabel(f"Seconds per step (NSW={args.nsw})")
+    plt.xlabel(f"Seconds per step (NSW={nsw})")
     plt.title("VASP Benchmark Runtimes")
     # annotate bars
     for i, v in enumerate(df_plot["runtime_per_step_s"]):

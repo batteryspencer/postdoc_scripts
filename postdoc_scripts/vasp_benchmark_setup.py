@@ -4,8 +4,8 @@ import shutil
 # # ------------------------------------------------------------------
 # # USER OPTIONS: choose which combos to include (no argparse)
 # # ------------------------------------------------------------------
-# 1) Full sweep: all (ncore, npar, kpar) that fill cores_per_node
-USE_SWEEP = False
+# 1) Full sweep: all (ncore, npar, kpar) that fill total_ranks
+USE_SWEEP = True
 
 # 2) Manual combos: list of tuples (NCORE, NPAR, KPAR)
 MANUAL_COMBOS = [
@@ -17,12 +17,14 @@ USE_TOP_CSV = False
 TOP_CSV_PATH = "top_configs.csv"
 
 # Include original (baseline) configuration without NCORE/NPAR/KPAR
-ADD_BASELINE = False
+ADD_BASELINE = True
 
 # ------------------------------------------------------------------
 # Generate combinations based on user options
 # ------------------------------------------------------------------
+num_nodes = 1                     # --nodes in submit.sh
 cores_per_node = 192               # --ntasks-per-node in submit.sh
+total_ranks = cores_per_node * num_nodes  # total ranks to use
 ncore_options = [4, 8, 12, 16]     # band‑parallel sizes to probe
 kpar_options = [1, 2, 4, 6]        # k‑point groups to probe
 
@@ -30,8 +32,8 @@ combinations = []
 if USE_SWEEP:
     for ncore in ncore_options:
         for kpar in kpar_options:
-            if cores_per_node % (ncore * kpar) == 0:     # must divide evenly
-                npar = cores_per_node // (ncore * kpar)  # communication groups
+            if total_ranks % (ncore * kpar) == 0:     # must divide evenly
+                npar = total_ranks // (ncore * kpar)  # communication groups
                 combinations.append((ncore, npar, kpar))
 
 if MANUAL_COMBOS:

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 def main():
     base = Path('.')
@@ -56,22 +57,34 @@ def main():
             )
     print("Wrote multi_node_summary.txt")
 
-    # Plot best runtime vs nodes with config annotations
-    plt.figure(figsize=(6, 4))
-    bars = plt.bar(best_df['nodes'].astype(str), best_df['runtime_per_step_s'])
-    plt.xlabel("Number of nodes")
-    plt.ylabel("Seconds per step (best config)")
-    plt.title("Best VASP Benchmark Runtime vs Nodes")
+    # Plot: runtime vs nodes and compute cost per step
+    CORES_PER_NODE = 192
 
-    # Annotate each bar with runtime only
-    for bar in bars:
-        height = bar.get_height()
-        label = f"{height:.2f}s"
-        plt.text(bar.get_x() + bar.get_width()/2, height + 0.01*height,
-                 label, ha='center', va='bottom', fontsize=8)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 8), sharex=True)
 
-    plt.tight_layout()
-    plt.savefig('multi_node_plot.png', dpi=300)
+    # Top panel: runtime per step
+    bars1 = ax1.bar(best_df['nodes'].astype(str), best_df['runtime_per_step_s'])
+    # ax1.set_xlabel("Number of nodes")  # Remove x-axis label from top plot
+    ax1.set_ylabel("Seconds per step")
+    ax1.set_title("Runtime per step")
+    for bar in bars1:
+        h = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width() / 2, h + 0.01 * h,
+                 f"{h:.2f}s", ha='center', va='bottom', fontsize=8)
+
+    # Bottom panel: compute cost per step (core·seconds)
+    cost = best_df['runtime_per_step_s'] * best_df['nodes'] * CORES_PER_NODE
+    bars2 = ax2.bar(best_df['nodes'].astype(str), cost)
+    ax2.set_xlabel("Number of nodes")
+    ax2.set_ylabel("Core·seconds per step")
+    ax2.set_title("Compute cost per step")
+    for bar in bars2:
+        h = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width() / 2, h + 0.01 * h,
+                 f"{h:.0f}", ha='center', va='bottom', fontsize=8)
+
+    fig.tight_layout()
+    fig.savefig('multi_node_plot.png', dpi=300)
     print("Wrote multi_node_plot.png")
 
 if __name__ == '__main__':

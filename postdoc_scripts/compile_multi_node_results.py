@@ -24,7 +24,7 @@ def main():
     # Gather each node directory
     for node_dir in sorted(base.glob('nodes=*')):
         n = node_dir.name.split('=', 1)[1]
-        csv_path = node_dir / 'benchmark_folders' / 'benchmark_results.csv'
+        csv_path = node_dir / 'benchmark_results.csv'
         if not csv_path.exists():
             print(f"Warning: {csv_path} not found; skipping.")
             continue
@@ -33,7 +33,7 @@ def main():
         all_dfs.append(df)
 
     if not all_dfs:
-        sys.exit("No benchmark_results.csv files found under nodes=*/benchmark_folders/")
+        sys.exit("No benchmark_results.csv files found under nodes=*/")
 
     # Combine
     big_df = pd.concat(all_dfs, ignore_index=True)

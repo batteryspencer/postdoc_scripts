@@ -9,12 +9,13 @@ from dataclasses import dataclass
 @dataclass
 class PlotConfig:
     label_fontsize: int = 16
-    title_fontsize: int = 18
+    title_fontsize: int = 17
     tick_labelsize: int = 12
     legend_fontsize: int = 14
     tick_length_major: int = 8
     tick_width_major: int = 1
     width: float = 0.2
+    capsize: int = 4
 
 def find_coefficients(x1, y1, x2, y2, ymax):
     # Define the variables
@@ -45,26 +46,33 @@ def find_valid_coefficients(x1, y1, x2, y2, ymax):
     return valid_solution
 
 def plot_free_energy_diagram(states: dict[str, float],
-                             barriers: dict[tuple[str, str], float],
+                             forward_barriers: dict[tuple[str, str], float],
+                             reverse_barriers: dict[tuple[str, str], float],
+                             forward_errors: dict[tuple[str, str], float],
+                             reverse_errors: dict[tuple[str, str], float],
                              positions: dict[str, float],
                              config: PlotConfig):
     """
-    Plot free energy diagram given states, barriers, and positions.
+    Plot free energy diagram given states, barriers, errors, and positions.
     """
     fig, ax = plt.subplots()
 
-    # Plot horizontal lines for states
+    # Plot horizontal lines for states with annotation
     for state, energy in states.items():
         x = positions[state]
-        ax.hlines(y=energy, xmin=x - config.width, xmax=x + config.width, colors='black')
-        ax.text(x, energy - 0.1, f'  {state} ({energy:.2f} eV)',
-                verticalalignment='bottom')
+        ax.plot([x - config.width, x + config.width], [energy, energy], color='black')
+        ax.text(x - 0.2, energy - 0.2, f'  {state}\n{energy:.2f} eV',
+                verticalalignment='bottom', horizontalalignment='left')
 
-    # Plot barriers and transitions
-    for (start, end), barrier in barriers.items():
+    # Plot barriers and transitions with error bars
+    for (start, end) in forward_barriers:
         start_x, end_x = positions[start], positions[end]
         start_e, end_e = states[start], states[end]
-        barrier_e = barrier + start_e
+        Ea = forward_barriers[(start, end)]
+        Ea_err = forward_errors[(start, end)]
+        Eb = reverse_barriers[(start, end)]
+        Eb_err = reverse_errors[(start, end)]
+        barrier_e = Ea + start_e
 
         x1, y1 = start_x + config.width, start_e
         x2, y2 = end_x - config.width, end_e
@@ -74,9 +82,10 @@ def plot_free_energy_diagram(states: dict[str, float],
         ys = a * xs**2 + b * xs + c
         ax.plot(xs, ys, 'gray', linestyle='--')
         xc = -b / (2*a)
-        ax.scatter([xc], [barrier_e], color='red')
-        ax.text(xc, barrier_e, f'  E$_a$={(barrier_e - start_e):.2f} eV',
-                verticalalignment='bottom', color='red')
+        ax.text(xc, barrier_e + 0.12, f'E$_a$={Ea:.2f} eV',
+                verticalalignment='bottom', horizontalalignment='center', color='red')
+        ax.text(xc, barrier_e + 0.10, f'E$_b$={Eb:.2f} eV',
+                verticalalignment='top', horizontalalignment='center', color='blue')
 
     ax.yaxis.set_major_locator(ticker.MultipleLocator(0.5))
     ax.set_xlabel('Reaction Coordinate', fontsize=config.label_fontsize)
@@ -93,31 +102,42 @@ def plot_free_energy_diagram(states: dict[str, float],
     return fig, ax
 
 def main():
-    # Data
-    states = {
-        "CH4*": 0.00,
-        "CH3*": 0.46,
-        "CH2*": 0.92,
-        "CH*": 0.62,
-        "C*": 0.84,
-    }
+    # Define steps with energies and errors
+    steps = [
+        {"start":"CH4*","end":"CH3*","Ea":1.14,"Ea_err":0.04,"Eb":0.68,"Eb_err":0.04,"deltaG":0.46,"deltaG_err":0.05},
+        {"start":"CH3*","end":"CH2*","Ea":1.03,"Ea_err":0.05,"Eb":0.57,"Eb_err":0.05,"deltaG":0.47,"deltaG_err":0.07},
+        {"start":"CH2*","end":"CH*","Ea":0.51,"Ea_err":0.05,"Eb":0.78,"Eb_err":0.04,"deltaG":-0.27,"deltaG_err":0.06},
+        {"start":"CH*","end":"C*","Ea":0.92,"Ea_err":0.05,"Eb":0.68,"Eb_err":0.07,"deltaG":0.24,"deltaG_err":0.08},
+    ]
 
-    barriers = {
-        ("CH4*", "CH3*"): 1.14,
-        ("CH3*", "CH2*"): 1.02,
-        ("CH2*", "CH*"): 0.49,
-        ("CH*", "C*"): 0.91,
-    }
+    # Build states dictionary
+    states = {steps[0]["start"]: 0.0}
+    for step in steps:
+        start = step["start"]
+        end = step["end"]
+        states[end] = states[start] + step["deltaG"]
 
-    positions = {state: i for i, state in enumerate(states)}
+    # Build barrier and error dictionaries
+    forward_barriers = {}
+    reverse_barriers = {}
+    forward_errors = {}
+    reverse_errors = {}
+    positions = {}
 
-    # Normalize energies
-    ref = states["CH4*"]
-    for key in states:
-        states[key] -= ref
+    # Assign positions based on order in states
+    for i, state in enumerate(states):
+        positions[state] = i
+
+    for step in steps:
+        key = (step["start"], step["end"])
+        forward_barriers[key] = step["Ea"]
+        forward_errors[key] = step["Ea_err"]
+        reverse_barriers[key] = step["Eb"]
+        reverse_errors[key] = step["Eb_err"]
 
     config = PlotConfig()
-    fig, ax = plot_free_energy_diagram(states, barriers, positions, config)
+    fig, ax = plot_free_energy_diagram(states, forward_barriers, reverse_barriers,
+                                       forward_errors, reverse_errors, positions, config)
     plt.tight_layout()
     plt.savefig('free_energy_diagram_solvent_CH4_Pt111.png', dpi=300)
 

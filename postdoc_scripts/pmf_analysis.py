@@ -279,19 +279,26 @@ def plot_pmf(results, x, y, std_dev, annotate=True, color_scheme="presentation",
         xx = np.linspace(x_sorted[0], x_sorted[-1], 200)
         yy = spline(xx)
         plt.plot(xx, yy, color="black")
+        mask_forward = (xx >= results["IS"]) & (xx <= results["TS"])
+        mask_reverse = (xx >= results["TS"]) & (xx <= results["FS"])
+        if color_scheme == "publication":
+            plt.fill_between(xx, yy, where=mask_forward, facecolor='0.9', interpolate=True)
+            plt.fill_between(xx, yy, where=mask_reverse, facecolor='0.9', interpolate=True)
+        else:
+            plt.fill_between(xx, yy, where=mask_forward, color="red", alpha=0.3, interpolate=True)
+            plt.fill_between(xx, yy, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
     else:
         plt.plot(x_sorted, y_sorted, color="black")  # PMF curve
-    plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
+        mask_forward = (x_sorted >= results["IS"]) & (x_sorted <= results["TS"])
+        mask_reverse = (x_sorted >= results["TS"]) & (x_sorted <= results["FS"])
+        if color_scheme == "publication":
+            plt.fill_between(x_sorted, y_sorted, where=mask_forward, facecolor='0.9', interpolate=True)
+            plt.fill_between(x_sorted, y_sorted, where=mask_reverse, facecolor='0.9', interpolate=True)
+        else:
+            plt.fill_between(x_sorted, y_sorted, where=mask_forward, color="red", alpha=0.3, interpolate=True)
+            plt.fill_between(x_sorted, y_sorted, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
 
-    # Fill areas under the curve between IS-TS and TS-FS
-    mask_forward = (x_sorted >= results["IS"]) & (x_sorted <= results["TS"])
-    mask_reverse = (x_sorted >= results["TS"]) & (x_sorted <= results["FS"])
-    if color_scheme == "publication":
-        plt.fill_between(x_sorted, y_sorted, where=mask_forward, facecolor='0.9', interpolate=True)
-        plt.fill_between(x_sorted, y_sorted, where=mask_reverse, facecolor='0.9', interpolate=True)
-    else:  # presentation style
-        plt.fill_between(x_sorted, y_sorted, where=mask_forward, color="red", alpha=0.3, interpolate=True)
-        plt.fill_between(x_sorted, y_sorted, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
+    plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
 
     if annotate:
         # Plot markers for IS, TS, FS and annotate them with arrow and rectangular text box

@@ -54,15 +54,15 @@ def integrated_autocorrelation_time(x):
 
 def calculate_statistics(lambda_values_per_cv):
     mean_force = np.mean(lambda_values_per_cv)
-    std_uncorr = np.std(lambda_values_per_cv)
+    std_dev_raw = np.std(lambda_values_per_cv)
     tau = integrated_autocorrelation_time(lambda_values_per_cv)
-    # Effective standard deviation accounts for the correlation time
-    std_eff = std_uncorr * np.sqrt(tau / len(lambda_values_per_cv))
-    return mean_force, std_eff
+    # Effective standard error on the mean accounts for the correlation time
+    std_err_mean = std_dev_raw * np.sqrt(tau / len(lambda_values_per_cv))
+    return mean_force, std_err_mean
 
 def cumulative_force_analysis(force_values):
     cumulative_means = []
-    cumulative_stds = []
+    cumulative_std_errs = []
     cumulative_intervals = []
 
     total_number = len(force_values)
@@ -71,13 +71,14 @@ def cumulative_force_analysis(force_values):
             cumulative_intervals.append(i)
             subset = force_values[:i]
             mean_val = np.mean(subset)
-            std_uncorr = np.std(subset)
+            std_dev_raw = np.std(subset)
             tau = integrated_autocorrelation_time(subset)
-            effective_std = std_uncorr * np.sqrt(tau / i)
+            # Effective standard error on the mean accounts for correlation time
+            std_err_mean = std_dev_raw * np.sqrt(tau / i)
             cumulative_means.append(mean_val)
-            cumulative_stds.append(effective_std)
+            cumulative_std_errs.append(std_err_mean)
 
-    return cumulative_intervals, cumulative_means, cumulative_stds
+    return cumulative_intervals, cumulative_means, cumulative_std_errs
 
 def find_histogram_peaks(data, bins=100):
     """Find significant peaks in histogram using smoothing and peak detection."""
@@ -152,7 +153,7 @@ def main():
     plt.savefig('force_vs_frame.png', dpi=300)
 
     mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
-    cumulative_intervals, cumulative_means, cumulative_stds = cumulative_force_analysis(lambda_values_per_cv)
+    cumulative_intervals, cumulative_means, cumulative_std_errs = cumulative_force_analysis(lambda_values_per_cv)
     histogram_peaks = find_histogram_peaks(lambda_values_per_cv)
 
     # Find frames corresponding to peaks
@@ -169,7 +170,7 @@ def main():
         # Write cumulative analysis results to the file with aligned formatting
         output_file.write("Cumulative Analysis Results:\n")
         output_file.write(f"{'Interval':>10}{'Cumulative Mean':>20}{'Cumulative Std':>20}\n")
-        for interval, mean, std in zip(cumulative_intervals, cumulative_means, cumulative_stds):
+        for interval, mean, std in zip(cumulative_intervals, cumulative_means, cumulative_std_errs):
             output_file.write(f"{interval:>10}{mean:>20.2f}{std:>20.2f}\n")
 
         # Write histogram peak information with corresponding frames
@@ -181,7 +182,7 @@ def main():
             output_file.write(f"   Reference Frames: {frame_str}\n")
 
     plt.figure()
-    plt.errorbar(np.array(cumulative_intervals) * timestep_fs / PS_TO_FS, cumulative_means, yerr=cumulative_stds, capsize=4, fmt='o-', label='Cumulative Mean Force')
+    plt.errorbar(np.array(cumulative_intervals) * timestep_fs / PS_TO_FS, cumulative_means, yerr=cumulative_std_errs, capsize=4, fmt='o-', label='Cumulative Mean Force')
     plt.xlabel('Simulation Time (ps)')
     plt.ylabel('Force (Arbitrary Units)')
     plt.title('Cumulative Analysis of Mean Force Over Simulation Intervals')

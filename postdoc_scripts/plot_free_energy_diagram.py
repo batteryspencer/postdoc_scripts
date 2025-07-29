@@ -42,22 +42,23 @@ def find_valid_coefficients(x1, y1, x2, y2, ymax):
 
 # Data
 states = {
-    "propane*": -0.31,   # Pt:C3H8 binding energy
-    "1-propyl*": 0.16,   # Pt:1-Propyl (C3H7) binding energy
-    "2-propyl*": 0.11,   # Pt:2-Propyl (C3H7) binding energy
-    "propylene*": -1.06  # Pt:C3H6_di-sigma-bonded binding energy
+    "CH4*": 0.00,
+    "CH3*": 0.46,
+    "CH2*": 0.92,
+    "CH*": 0.62,
+    "C*": 0.84,
 }
 
 # Barriers
 barriers = {
-    ("propane*", "1-propyl*"): 0.96,
-    ("propane*", "2-propyl*"): 0.83,
-    ("1-propyl*", "propylene*"): 0.67,
-    ("2-propyl*", "propylene*"): 0.70
+    ("CH4*", "CH3*"): 1.14,
+    ("CH3*", "CH2*"): 1.02,
+    ("CH2*", "CH*"): 0.49,
+    ("CH*", "C*"): 0.91,
 }
 
-# Normalize energies to propane* energy
-reference_energy = states["propane*"]
+# Normalize energies to methane* energy
+reference_energy = states["CH4*"]
 for state in states:
     states[state] -= reference_energy
 
@@ -66,10 +67,11 @@ fig, ax = plt.subplots()
 
 # Horizontal positions and widths
 positions = {
-    "propane*": 0,
-    "1-propyl*": 1,
-    "2-propyl*": 1,
-    "propylene*": 2
+    "CH4*": 0,
+    "CH3*": 1,
+    "CH2*": 2,
+    "CH*": 3,
+    "C*": 4
 }
 width = 0.2  # Width of the horizontal lines
 
@@ -79,17 +81,17 @@ for state, energy in states.items():
     ax.hlines(y=energy, xmin=x_pos - width, xmax=x_pos + width, colors='black')
 
     # Label the lines
-    ax.text(x_pos, energy, f'  {state} ({energy:.2f} eV)', verticalalignment='bottom')
+    ax.text(x_pos, energy - 0.1, f'  {state} ({energy:.2f} eV)', verticalalignment='bottom')
 
 # Draw lines and barriers for transitions
 transitions = [
-    ("propane*", "1-propyl*"),
-    ("propane*", "2-propyl*"),
-    ("1-propyl*", "propylene*"),
-    ("2-propyl*", "propylene*")
+    ("CH4*", "CH3*"),
+    ("CH3*", "CH2*"),
+    ("CH2*", "CH*"),
+    ("CH*", "C*"),
 ]
 
-colors = ['red', 'blue', 'red', 'blue']
+colors = ['red', 'red', 'red', 'red']
 
 for i, (start, end) in enumerate(transitions):
     start_pos = positions[start]
@@ -113,12 +115,7 @@ for i, (start, end) in enumerate(transitions):
 
         ax.plot(x, y, 'gray', linestyle='--')
         ax.scatter([barrier_pos], [barrier_energy], color=colors[i])
-        
-        # Apply offset and adjust text position for second dehydrogenation
-        if (start, end) == ("2-propyl*", "propylene*"):
-            ax.text(barrier_pos + 0.1, barrier_energy - 0.05, f'Barrier ({barrier_energy - start_energy:.2f} eV)', verticalalignment='top', horizontalalignment='left', color=colors[i])
-        else:
-            ax.text(barrier_pos, barrier_energy, f'  Barrier ({barrier_energy - start_energy:.2f} eV)', verticalalignment='bottom', color=colors[i])
+        ax.text(barrier_pos, barrier_energy, f'  E$_a$={barrier_energy - start_energy:.2f} eV', verticalalignment='bottom', color=colors[i])
     else:
         # Plot a straight line if no barrier is provided
         ax.plot([start_pos + width, end_pos - width], [start_energy, end_energy], 'gray', linestyle='--')
@@ -129,11 +126,15 @@ ax.yaxis.set_major_locator(ticker.MultipleLocator(0.5))
 # Set labels and title
 ax.set_xlabel('Reaction Coordinate', fontsize=LABEL_FONTSIZE)
 ax.set_ylabel('Free Energy (eV)', fontsize=LABEL_FONTSIZE)
-ax.set_title('Propane to Propylene Conversion', fontsize=TITLE_FONTSIZE)
+ax.set_title('CH$_4$ to C Conversion on Pt(111)', fontsize=TITLE_FONTSIZE)
 plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
 ax.set_xticks([])
-ax.set_xlim(-0.5, 2.5)
+# ax.set_xlim(-0.5, 3.5)
+ax.set_ylim(-0.25, ax.get_ylim()[1] + 0.25)
+
+legend = plt.gca().legend(['Solvent Phase'], loc='upper left')
+legend.get_texts()[0].set_color("green")
 
 plt.tight_layout()
-plt.savefig('free_energy_diagram.png', dpi=300)
+plt.savefig('free_energy_diagram_solvent_CH4.png', dpi=300)
 

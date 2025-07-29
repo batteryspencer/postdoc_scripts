@@ -345,7 +345,7 @@ def main():
         text_file.write(table_string + '\n\n')
         text_file.write(results_string)
 
-    plot_pmf(results, x, y, std_dev, annotate=False, color_scheme="publication", plot_spline=False)
+    plot_pmf(results, x, y, std_dev, annotate=False, color_scheme="publication", plot_spline=True)
 
 if __name__ == "__main__":
     main()

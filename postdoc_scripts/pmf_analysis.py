@@ -220,20 +220,29 @@ def calculate_pmf(x, y, std_dev):
     backward_barrier = abs(-(anti(fs_val) - anti(ts_val)))
     delta_G = -(anti(fs_val) - anti(is_val))
 
-    # Error propagation via bootstrap sampling over the spline fits
-    N_boot = 2000
+    # Error propagation via non-parametric bootstrap sampling
+    N_boot = 5000
     rng = np.random.default_rng()
     areas_fwd = []
     areas_bwd = []
     areas_dG = []
+    n_points = len(x_sorted)
     for _ in range(N_boot):
-        # sample new force values from their uncertainties
-        y_samp = rng.normal(y_sorted, std_sorted)
-        spline_s = PchipInterpolator(x_sorted, y_samp)
-        anti_s = spline_s.antiderivative()
-        areas_fwd.append(abs(-(anti_s(ts_val) - anti_s(is_val))))
-        areas_bwd.append(abs(-(anti_s(fs_val) - anti_s(ts_val))))
-        areas_dG.append(-(anti_s(fs_val) - anti_s(is_val)))
+        # sample with replacement from the original data points
+        idx = rng.integers(0, n_points, size=n_points)
+        x_bs = x_sorted[idx]
+        y_bs = y_sorted[idx]
+        # combine duplicates by averaging to ensure strictly increasing x
+        bs_df = pd.DataFrame({'x': x_bs, 'y': y_bs})
+        bs_df = bs_df.groupby('x', sort=True, as_index=False)['y'].mean()
+        x_bs_sorted = bs_df['x'].to_numpy()
+        y_bs_sorted = bs_df['y'].to_numpy()
+        # build spline and integrate using the original intercepts
+        spline_bs = PchipInterpolator(x_bs_sorted, y_bs_sorted)
+        anti_bs = spline_bs.antiderivative()
+        areas_fwd.append(abs(anti_bs(ts_val) - anti_bs(is_val)))
+        areas_bwd.append(abs(anti_bs(fs_val) - anti_bs(ts_val)))
+        areas_dG.append(anti_bs(fs_val) - anti_bs(is_val))
 
     forward_std = np.std(areas_fwd, ddof=1)
     backward_std = np.std(areas_bwd, ddof=1)

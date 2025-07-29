@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy.polynomial.polynomial as poly
-from scipy.integrate import simpson
+from scipy.interpolate import PchipInterpolator
 
 # Define font sizes and tick parameters as constants
 LABEL_FONTSIZE = 18
@@ -211,25 +211,33 @@ def calculate_pmf(x, y, std_dev):
     idx_ts = find_nearest_index(x_sorted, ts_val)
     idx_fs = find_nearest_index(x_sorted, fs_val)
 
-    # Integrate force (using Simpson's rule) to estimate free energy barriers
-    # Forward barrier: from IS to TS
-    forward_barrier = abs(-simpson(y_sorted[idx_is:idx_ts + 1], x=x_sorted[idx_is:idx_ts + 1]))
-    forward_variance = simpson((std_sorted[idx_is:idx_ts + 1])**2, x=x_sorted[idx_is:idx_ts + 1])
-    forward_std = np.sqrt(forward_variance)
-    
-    # Backward barrier: from TS to FS
-    backward_barrier = abs(-simpson(y_sorted[idx_ts:idx_fs + 1], x=x_sorted[idx_ts:idx_fs + 1]))
-    backward_variance = simpson((std_sorted[idx_ts:idx_fs + 1])**2, x=x_sorted[idx_ts:idx_fs + 1])
-    backward_std = np.sqrt(backward_variance)
+    # Compute barriers using PCHIP spline integration
+    spline = PchipInterpolator(x_sorted, y_sorted)
+    anti = spline.antiderivative()
 
-    # Compute free energy of reaction (ΔG) and its uncertainty from IS to FS
-    # ΔG = -∫F(x)dx from IS to FS
-    # Note: The negative sign is used to convert from force to free energy
-    # The integral of the force gives the change in free energy
-    # between the initial and final states.
-    delta_G = -simpson(y_sorted[idx_is:idx_fs + 1], x=x_sorted[idx_is:idx_fs + 1])
-    delta_G_var = simpson((std_sorted[idx_is:idx_fs + 1])**2, x=x_sorted[idx_is:idx_fs + 1])
-    delta_G_std = np.sqrt(delta_G_var)
+    # Barrier and reaction energies via spline antiderivative
+    forward_barrier = abs(-(anti(ts_val) - anti(is_val)))
+    backward_barrier = abs(-(anti(fs_val) - anti(ts_val)))
+    delta_G = -(anti(fs_val) - anti(is_val))
+
+    # Error propagation via bootstrap sampling over the spline fits
+    N_boot = 2000
+    rng = np.random.default_rng()
+    areas_fwd = []
+    areas_bwd = []
+    areas_dG = []
+    for _ in range(N_boot):
+        # sample new force values from their uncertainties
+        y_samp = rng.normal(y_sorted, std_sorted)
+        spline_s = PchipInterpolator(x_sorted, y_samp)
+        anti_s = spline_s.antiderivative()
+        areas_fwd.append(abs(-(anti_s(ts_val) - anti_s(is_val))))
+        areas_bwd.append(abs(-(anti_s(fs_val) - anti_s(ts_val))))
+        areas_dG.append(-(anti_s(fs_val) - anti_s(is_val)))
+
+    forward_std = np.std(areas_fwd, ddof=1)
+    backward_std = np.std(areas_bwd, ddof=1)
+    delta_G_std = np.std(areas_dG, ddof=1)
 
     return {
         "x_sorted": x_sorted,
@@ -260,12 +268,19 @@ def format_results(results):
     results_string += f"Final State: {results['FS']:.2f} Å\n"
     return results_string
 
-def plot_pmf(results, x, y, std_dev, annotate=True, color_scheme="presentation"):
+def plot_pmf(results, x, y, std_dev, annotate=True, color_scheme="presentation", plot_spline=False):
     # Plot the PMF curve
     plt.figure(figsize=(10, 6))
     x_sorted = results["x_sorted"]
     y_sorted = results["y_sorted"]
-    plt.plot(x_sorted, y_sorted, color="black")  # PMF curve
+    if plot_spline:
+        # evaluate PCHIP spline on a fine grid
+        spline = PchipInterpolator(x_sorted, y_sorted)
+        xx = np.linspace(x_sorted[0], x_sorted[-1], 200)
+        yy = spline(xx)
+        plt.plot(xx, yy, color="black")
+    else:
+        plt.plot(x_sorted, y_sorted, color="black")  # PMF curve
     plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
 
     # Fill areas under the curve between IS-TS and TS-FS
@@ -330,7 +345,7 @@ def main():
         text_file.write(table_string + '\n\n')
         text_file.write(results_string)
 
-    plot_pmf(results, x, y, std_dev, annotate=False, color_scheme="publication")
+    plot_pmf(results, x, y, std_dev, annotate=False, color_scheme="publication", plot_spline=False)
 
 if __name__ == "__main__":
     main()

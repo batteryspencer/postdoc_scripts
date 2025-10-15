@@ -96,7 +96,7 @@ def process_data():
 # Updated calculate_pmf to identify three x-intercepts (IS, TS, FS) and extrapolate missing ones
 # TS is defined as the intercept where the force changes from negative to positive.
 # IS is the intercept to the left of TS (force changes from positive to negative) and FS is to the right.
-# If either IS or FS is missing from raw data, a cubic polynomial extrapolation is performed using the nearest 7 points.
+# If either IS or FS is missing from raw data, a cubic polynomial extrapolation is performed using the nearest 5 points.
 # Finally, the function inserts these intercepts into the sorted data and integrates between IS-TS and TS-FS to obtain
 # the forward and backward barriers, respectively.
 
@@ -220,29 +220,49 @@ def calculate_pmf(x, y, std_dev):
     backward_barrier = abs(-(anti(fs_val) - anti(ts_val)))
     delta_G = -(anti(fs_val) - anti(is_val))
 
-    # Error propagation via non-parametric bootstrap sampling
+    # Error propagation via non-parametric bootstrap (pairs) with endpoint forcing
     N_boot = 5000
     rng = np.random.default_rng()
     areas_fwd = []
     areas_bwd = []
     areas_dG = []
     n_points = len(x_sorted)
+
     for _ in range(N_boot):
-        # sample with replacement from the original data points
-        idx = rng.integers(0, n_points, size=n_points)
+        # sample indices with replacement but force-include the domain endpoints
+        idx_core = rng.integers(0, n_points, size=n_points - 2)
+        idx = np.concatenate(([0, n_points - 1], idx_core))
+
+        # build bootstrap sample and ensure strictly increasing x
         x_bs = x_sorted[idx]
         y_bs = y_sorted[idx]
-        # combine duplicates by averaging to ensure strictly increasing x
+
+        # sort by x while keeping y paired
+        order = np.argsort(x_bs)
+        x_bs = x_bs[order]
+        y_bs = y_bs[order]
+
+        # combine duplicate x by averaging to keep strictly increasing grid
         bs_df = pd.DataFrame({'x': x_bs, 'y': y_bs})
         bs_df = bs_df.groupby('x', sort=True, as_index=False)['y'].mean()
         x_bs_sorted = bs_df['x'].to_numpy()
         y_bs_sorted = bs_df['y'].to_numpy()
+
+        # make sure the bootstrap domain still spans [IS, FS]; if not, pad with original endpoints
+        if x_bs_sorted[0] > x_sorted[0]:
+            x_bs_sorted = np.insert(x_bs_sorted, 0, x_sorted[0])
+            y_bs_sorted = np.insert(y_bs_sorted, 0, y_sorted[0])
+        if x_bs_sorted[-1] < x_sorted[-1]:
+            x_bs_sorted = np.append(x_bs_sorted, x_sorted[-1])
+            y_bs_sorted = np.append(y_bs_sorted, y_sorted[-1])
+
         # build spline and integrate using the original intercepts
-        spline_bs = PchipInterpolator(x_bs_sorted, y_bs_sorted)
+        spline_bs = PchipInterpolator(x_bs_sorted, y_bs_sorted, extrapolate=True)
         anti_bs = spline_bs.antiderivative()
-        areas_fwd.append(abs(anti_bs(ts_val) - anti_bs(is_val)))
-        areas_bwd.append(abs(anti_bs(fs_val) - anti_bs(ts_val)))
-        areas_dG.append(anti_bs(fs_val) - anti_bs(is_val))
+
+        areas_fwd.append(abs(-(anti_bs(ts_val) - anti_bs(is_val))))
+        areas_bwd.append(abs(-(anti_bs(fs_val) - anti_bs(ts_val))))
+        areas_dG.append(-(anti_bs(fs_val) - anti_bs(is_val)))
 
     forward_std = np.std(areas_fwd, ddof=1)
     backward_std = np.std(areas_bwd, ddof=1)

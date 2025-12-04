@@ -100,6 +100,52 @@ def process_data():
 # Finally, the function inserts these intercepts into the sorted data and integrates between IS-TS and TS-FS to obtain
 # the forward and backward barriers, respectively.
 
+def find_intercepts_from_spline(spline, x_min, x_max, n_eval=1000):
+    """
+    Find zero-force intercepts (IS, TS, FS) from a spline by evaluating on a fine grid.
+
+    Parameters:
+    - spline: PchipInterpolator object
+    - x_min, x_max: domain bounds for evaluation
+    - n_eval: number of points to evaluate the spline
+
+    Returns:
+    - is_val, ts_val, fs_val: intercept positions (or None if not found)
+    """
+    # Evaluate spline on fine grid
+    x_eval = np.linspace(x_min, x_max, n_eval)
+    y_eval = spline(x_eval)
+
+    # Find zero crossings
+    raw_intercepts = []
+    for i in range(len(y_eval) - 1):
+        if y_eval[i] * y_eval[i + 1] < 0:
+            # Linear interpolation between grid points
+            x_cross = x_eval[i] - (y_eval[i] * (x_eval[i + 1] - x_eval[i]) / (y_eval[i + 1] - y_eval[i]))
+            if y_eval[i] < 0 and y_eval[i + 1] > 0:
+                raw_intercepts.append((x_cross, "TS"))
+            else:
+                raw_intercepts.append((x_cross, "other"))
+
+    # Identify TS (negative-to-positive crossing)
+    ts_candidates = [xi for xi, typ in raw_intercepts if typ == "TS"]
+    ts_val = ts_candidates[0] if ts_candidates else None
+
+    # Identify IS and FS relative to TS
+    is_val = None
+    fs_val = None
+    if ts_val is not None:
+        for xi, typ in raw_intercepts:
+            if typ != "TS":
+                if xi < ts_val:
+                    if is_val is None or (ts_val - xi) < (ts_val - is_val):
+                        is_val = xi
+                elif xi > ts_val:
+                    if fs_val is None or (xi - ts_val) < (fs_val - ts_val):
+                        fs_val = xi
+
+    return is_val, ts_val, fs_val
+
 def calculate_pmf(x, y, std_dev):
     # Compute raw x-intercepts with sign information
     raw_intercepts = []
@@ -234,23 +280,46 @@ def calculate_pmf(x, y, std_dev):
         print(f"Warning: Thermodynamic inconsistency detected. Forward - Backward - Delta G = {consistency_check:.4f} eV (should be ~0)")
 
     # Error propagation via bootstrap sampling over the spline fits
+    # This approach samples force uncertainties AND allows intercept positions to vary
     N_boot = 2000
     rng = np.random.default_rng()
     areas_fwd = []
     areas_bwd = []
     areas_dG = []
+    n_failed = 0  # Track how many bootstrap samples fail to find intercepts
+
     for _ in range(N_boot):
-        # sample new force values from their uncertainties
+        # Sample new force values from their uncertainties
         y_samp = rng.normal(y_sorted, std_sorted)
         spline_s = PchipInterpolator(x_sorted, y_samp)
+
+        # Find intercepts for this bootstrap sample (allows TS position to vary)
+        is_boot, ts_boot, fs_boot = find_intercepts_from_spline(
+            spline_s, x_sorted[0], x_sorted[-1], n_eval=1000
+        )
+
+        # Fall back to original intercepts if bootstrap sample doesn't have clear crossings
+        if ts_boot is None:
+            n_failed += 1
+            ts_boot = ts_val
+        if is_boot is None:
+            is_boot = is_val
+        if fs_boot is None:
+            fs_boot = fs_val
+
+        # Integrate using bootstrap-specific intercepts
         anti_s = spline_s.antiderivative()
-        areas_fwd.append(-(anti_s(ts_val) - anti_s(is_val)))
-        areas_bwd.append(-(anti_s(ts_val) - anti_s(fs_val)))
-        areas_dG.append(-(anti_s(fs_val) - anti_s(is_val)))
+        areas_fwd.append(-(anti_s(ts_boot) - anti_s(is_boot)))
+        areas_bwd.append(-(anti_s(ts_boot) - anti_s(fs_boot)))
+        areas_dG.append(-(anti_s(fs_boot) - anti_s(is_boot)))
 
     forward_std = np.std(areas_fwd, ddof=1)
     backward_std = np.std(areas_bwd, ddof=1)
     delta_G_std = np.std(areas_dG, ddof=1)
+
+    # Report if any bootstrap samples failed to find TS
+    if n_failed > 0:
+        print(f"Note: {n_failed}/{N_boot} bootstrap samples failed to find TS crossing and used original TS position.")
 
     return {
         "x_sorted": x_sorted,

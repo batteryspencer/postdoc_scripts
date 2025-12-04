@@ -23,14 +23,14 @@ def read_force_stats(file_path):
     Returns a dictionary with:
       'CV': the CV value
       'Mean Force': the mean force value
-      'Standard Deviation': the standard deviation value
+      'Standard Error of Mean': the autocorrelation-corrected standard error of the mean
       'MD steps': the number of MD steps
       'cumulative_data': a list of tuples (interval, cumulative mean, cumulative std)
     """
     cumulative_data = []
     cv_value = None
     mean_force = None
-    std_dev = None
+    std_err_mean = None
     md_steps = None
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -41,8 +41,10 @@ def read_force_stats(file_path):
         elif 'Mean Force:' in line:
             # Negate to convert constraint force to thermodynamic force (-dG/dr)
             mean_force = -1 * float(line.split('Mean Force:')[1].strip())
-        elif 'Standard Deviation:' in line:
-            std_dev = float(line.split('Standard Deviation:')[1].strip())
+        elif 'Standard Error of Mean:' in line:
+            std_err_mean = float(line.split('Standard Error of Mean:')[1].strip())
+        elif 'Standard Deviation:' in line:  # Legacy support for old format
+            std_err_mean = float(line.split('Standard Deviation:')[1].strip())
         elif 'MD steps:' in line:
             md_steps = int(line.split('MD steps:')[1].strip())
 
@@ -70,7 +72,7 @@ def read_force_stats(file_path):
     return {
         "CV": cv_value,
         "Mean Force": mean_force,
-        "Standard Deviation": std_dev,
+        "Standard Error of Mean": std_err_mean,
         "MD steps": md_steps,
         "cumulative_data": cumulative_data
     }
@@ -79,7 +81,7 @@ def process_data():
     data = {
         'Constrained_Bond_Length (Å)': [],
         'Mean_Force (eV/Å)': [],
-        'Standard_Deviation (eV/Å)': [],
+        'Standard_Error_of_Mean (eV/Å)': [],
         'MD_steps': [],
     }
     for folder in glob.glob("[0-9].[0-9][0-9]_*"):
@@ -88,7 +90,7 @@ def process_data():
             file_stats = read_force_stats(file_path)
             data['Constrained_Bond_Length (Å)'].append(file_stats.get("CV"))
             data['Mean_Force (eV/Å)'].append(file_stats.get("Mean Force"))
-            data['Standard_Deviation (eV/Å)'].append(file_stats.get("Standard Deviation"))
+            data['Standard_Error_of_Mean (eV/Å)'].append(file_stats.get("Standard Error of Mean"))
             data['MD_steps'].append(file_stats.get("MD steps"))
     df = pd.DataFrame(data).sort_values(by=['Constrained_Bond_Length (Å)'])
     return df
@@ -424,7 +426,7 @@ def main():
     df = process_data()
     x = df['Constrained_Bond_Length (Å)'].to_numpy()
     y = df['Mean_Force (eV/Å)'].to_numpy()
-    std_dev = df['Standard_Deviation (eV/Å)'].to_numpy()
+    std_dev = df['Standard_Error_of_Mean (eV/Å)'].to_numpy()
 
     results = calculate_pmf(x, y, std_dev)
     results_string = format_results(results)

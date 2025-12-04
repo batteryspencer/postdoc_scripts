@@ -152,7 +152,7 @@ def main():
     plt.tight_layout()
     plt.savefig('force_vs_frame.png', dpi=300)
 
-    mean_force, std_dev = calculate_statistics(lambda_values_per_cv)
+    mean_force, std_err_mean = calculate_statistics(lambda_values_per_cv)
     cumulative_intervals, cumulative_means, cumulative_std_errs = cumulative_force_analysis(lambda_values_per_cv)
     histogram_peaks = find_histogram_peaks(lambda_values_per_cv)
 
@@ -164,7 +164,7 @@ def main():
         output_file.write(f'Integrating over Reaction Coordinate Index: {constraint_index}, with a total of {num_constraints} constraints\n')
         output_file.write(f'CV: {all_cv_values[0]:.2f}\n')
         output_file.write(f'Mean Force: {mean_force:.2f}\n')
-        output_file.write(f'Standard Deviation: {std_dev:.2f}\n')
+        output_file.write(f'Standard Error of Mean: {std_err_mean:.2f}\n')
         output_file.write(f'MD steps: {total_md_steps}\n')
 
         # Write cumulative analysis results to the file with aligned formatting

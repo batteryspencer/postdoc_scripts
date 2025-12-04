@@ -3,7 +3,6 @@ import glob
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy.polynomial.polynomial as poly
 from scipy.interpolate import PchipInterpolator
 
 # Define font sizes and tick parameters as constants
@@ -40,6 +39,7 @@ def read_force_stats(file_path):
         if 'CV:' in line:
             cv_value = float(line.split('CV:')[1].strip())
         elif 'Mean Force:' in line:
+            # Negate to convert constraint force to thermodynamic force (-dG/dr)
             mean_force = -1 * float(line.split('Mean Force:')[1].strip())
         elif 'Standard Deviation:' in line:
             std_dev = float(line.split('Standard Deviation:')[1].strip())
@@ -96,7 +96,7 @@ def process_data():
 # Updated calculate_pmf to identify three x-intercepts (IS, TS, FS) and extrapolate missing ones
 # TS is defined as the intercept where the force changes from negative to positive.
 # IS is the intercept to the left of TS (force changes from positive to negative) and FS is to the right.
-# If either IS or FS is missing from raw data, a cubic polynomial extrapolation is performed using the nearest 5 points.
+# If either IS or FS is missing from raw data, a cubic polynomial extrapolation is performed using the nearest 7 points.
 # Finally, the function inserts these intercepts into the sorted data and integrates between IS-TS and TS-FS to obtain
 # the forward and backward barriers, respectively.
 
@@ -116,6 +116,8 @@ def calculate_pmf(x, y, std_dev):
     # Identify TS from raw intercepts (should always exist since data spans TS)
     ts_candidates = [xi for xi, typ in raw_intercepts if typ == "TS"]
     if ts_candidates:
+        if len(ts_candidates) > 1:
+            print(f"Warning: Multiple TS candidates found at {[f'{x:.3f}' for x in ts_candidates]}. Using first one at {ts_candidates[0]:.3f} Å.")
         ts_val = ts_candidates[0]
     else:
         raise ValueError("TS intercept (negative-to-positive crossing) not found in raw data.")
@@ -139,6 +141,7 @@ def calculate_pmf(x, y, std_dev):
 
     if is_val is None:
         # Extrapolate on the left side using a polynomial fit
+        print("Warning: IS (initial state) intercept not found in raw data. Attempting polynomial extrapolation.")
         left_mask = x_sorted_raw < ts_val
         if np.sum(left_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
             x_left = x_sorted_raw[left_mask]
@@ -153,9 +156,11 @@ def calculate_pmf(x, y, std_dev):
             candidates = real_roots[(real_roots < ts_val) & (real_roots < x_fit[0])]
             if len(candidates) > 0:
                 is_val = candidates[np.argmin(np.abs(ts_val - candidates))]
+                print(f"  Extrapolated IS to {is_val:.3f} Å using {n_points} data points.")
 
     if fs_val is None:
         # Extrapolate on the right side using a polynomial fit
+        print("Warning: FS (final state) intercept not found in raw data. Attempting polynomial extrapolation.")
         right_mask = x_sorted_raw > ts_val
         if np.sum(right_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
             x_right = x_sorted_raw[right_mask]
@@ -170,11 +175,14 @@ def calculate_pmf(x, y, std_dev):
             candidates = real_roots[(real_roots > ts_val) & (real_roots > x_fit[-1])]
             if len(candidates) > 0:
                 fs_val = candidates[np.argmin(np.abs(candidates - ts_val))]
+                print(f"  Extrapolated FS to {fs_val:.3f} Å using {n_points} data points.")
 
     if is_val is None:
         is_val = x_sorted_raw[0]
+        print(f"  Extrapolation failed. Using leftmost data point at {is_val:.3f} Å as IS (may not be at zero force).")
     if fs_val is None:
         fs_val = x_sorted_raw[-1]
+        print(f"  Extrapolation failed. Using rightmost data point at {fs_val:.3f} Å as FS (may not be at zero force).")
 
     # Insert the intercepts into the data for integration
     # Only extend with points that are not already present in x
@@ -188,81 +196,57 @@ def calculate_pmf(x, y, std_dev):
     x_sorted = x_extended[sorted_indices]
     y_sorted = y_extended[sorted_indices]
 
-    # Create an extended std_dev array by interpolating at the intercept points
+    # Create an extended std_dev array by interpolating at the NEW intercept points only
     # First, sort the original x and std_dev data
     x_sorted_raw = np.sort(x)
     std_sorted_raw = np.array(std_dev)[np.argsort(x)]
-    
-    # Interpolate std_dev at the intercepts and concatenate with the original std_dev
-    std_extended = np.concatenate((std_dev, np.array([
-        np.interp(is_val, x_sorted_raw, std_sorted_raw),
-        np.interp(ts_val, x_sorted_raw, std_sorted_raw),
-        np.interp(fs_val, x_sorted_raw, std_sorted_raw)
-    ])))
-    
+
+    # Interpolate std_dev only for the new points that were actually added
+    std_new = [np.interp(pt, x_sorted_raw, std_sorted_raw) for pt in new_points]
+    std_extended = np.concatenate((std_dev, np.array(std_new)))
+
     # Sort the extended std_dev array using the same sorted indices
     std_sorted = std_extended[sorted_indices]
-
-    # Find nearest indices for IS, TS, FS
-    def find_nearest_index(arr, value):
-        return np.argmin(np.abs(arr - value))
-
-    idx_is = find_nearest_index(x_sorted, is_val)
-    idx_ts = find_nearest_index(x_sorted, ts_val)
-    idx_fs = find_nearest_index(x_sorted, fs_val)
 
     # Compute barriers using PCHIP spline integration
     spline = PchipInterpolator(x_sorted, y_sorted)
     anti = spline.antiderivative()
 
     # Barrier and reaction energies via spline antiderivative
-    forward_barrier = abs(-(anti(ts_val) - anti(is_val)))
-    backward_barrier = abs(-(anti(fs_val) - anti(ts_val)))
+    # PMF(x) = -integral(F(x)dx), so:
+    # Forward barrier = PMF(TS) - PMF(IS) = -(anti(TS) - anti(IS))
+    # Backward barrier = PMF(TS) - PMF(FS) = -(anti(TS) - anti(FS))
+    # Delta G = PMF(FS) - PMF(IS) = -(anti(FS) - anti(IS))
+    # These should satisfy: Forward - Backward = Delta G
+    forward_barrier = -(anti(ts_val) - anti(is_val))
+    backward_barrier = -(anti(ts_val) - anti(fs_val))
     delta_G = -(anti(fs_val) - anti(is_val))
 
-    # Error propagation via non-parametric bootstrap (pairs) with endpoint forcing
-    N_boot = 5000
+    # Validate that barriers are positive (sanity check)
+    if forward_barrier < 0:
+        raise ValueError(f"Negative forward barrier ({forward_barrier:.3f} eV) detected. Check TS identification and data quality.")
+    if backward_barrier < 0:
+        raise ValueError(f"Negative backward barrier ({backward_barrier:.3f} eV) detected. Check TS identification and data quality.")
+
+    # Verify thermodynamic consistency: Forward - Backward should equal Delta G
+    consistency_check = forward_barrier - backward_barrier - delta_G
+    if abs(consistency_check) > 0.01:  # tolerance of 0.01 eV
+        print(f"Warning: Thermodynamic inconsistency detected. Forward - Backward - Delta G = {consistency_check:.4f} eV (should be ~0)")
+
+    # Error propagation via bootstrap sampling over the spline fits
+    N_boot = 2000
     rng = np.random.default_rng()
     areas_fwd = []
     areas_bwd = []
     areas_dG = []
-    n_points = len(x_sorted)
-
     for _ in range(N_boot):
-        # sample indices with replacement but force-include the domain endpoints
-        idx_core = rng.integers(0, n_points, size=n_points - 2)
-        idx = np.concatenate(([0, n_points - 1], idx_core))
-
-        # build bootstrap sample and ensure strictly increasing x
-        x_bs = x_sorted[idx]
-        y_bs = y_sorted[idx]
-
-        # sort by x while keeping y paired
-        order = np.argsort(x_bs)
-        x_bs = x_bs[order]
-        y_bs = y_bs[order]
-
-        # combine duplicate x by averaging to keep strictly increasing grid
-        bs_df = pd.DataFrame({'x': x_bs, 'y': y_bs})
-        bs_df = bs_df.groupby('x', sort=True, as_index=False)['y'].mean()
-        x_bs_sorted = bs_df['x'].to_numpy()
-        y_bs_sorted = bs_df['y'].to_numpy()
-
-        # make sure the bootstrap domain still spans [IS, FS]; if not, pad with original endpoints
-        if x_bs_sorted[0] > x_sorted[0]:
-            x_bs_sorted = np.insert(x_bs_sorted, 0, x_sorted[0])
-            y_bs_sorted = np.insert(y_bs_sorted, 0, y_sorted[0])
-        if x_bs_sorted[-1] < x_sorted[-1]:
-            x_bs_sorted = np.append(x_bs_sorted, x_sorted[-1])
-            y_bs_sorted = np.append(y_bs_sorted, y_sorted[-1])
-
-        # build spline and integrate using the original intercepts
-        spline_bs = PchipInterpolator(x_bs_sorted, y_bs_sorted, extrapolate=True)
-        anti_bs = spline_bs.antiderivative()
-
-        areas_fwd.append(abs(-(anti_bs(ts_val) - anti_bs(is_val))))
-        areas_bwd.append(abs(-(anti_bs(fs_val) - anti_bs(ts_val))))
-        areas_dG.append(-(anti_bs(fs_val) - anti_bs(is_val)))
+        # sample new force values from their uncertainties
+        y_samp = rng.normal(y_sorted, std_sorted)
+        spline_s = PchipInterpolator(x_sorted, y_samp)
+        anti_s = spline_s.antiderivative()
+        areas_fwd.append(-(anti_s(ts_val) - anti_s(is_val)))
+        areas_bwd.append(-(anti_s(ts_val) - anti_s(fs_val)))
+        areas_dG.append(-(anti_s(fs_val) - anti_s(is_val)))
 
     forward_std = np.std(areas_fwd, ddof=1)
     backward_std = np.std(areas_bwd, ddof=1)
@@ -302,32 +286,35 @@ def plot_pmf(results, x, y, std_dev, annotate=True, color_scheme="presentation",
     plt.figure(figsize=(10, 6))
     x_sorted = results["x_sorted"]
     y_sorted = results["y_sorted"]
-    if plot_spline:
-        # evaluate PCHIP spline on a fine grid
-        spline = PchipInterpolator(x_sorted, y_sorted)
-        xx = np.linspace(x_sorted[0], x_sorted[-1], 200)
-        yy = spline(xx)
-        plt.plot(xx, yy, color="black")
-        mask_forward = (xx >= results["IS"]) & (xx <= results["TS"])
-        mask_reverse = (xx >= results["TS"]) & (xx <= results["FS"])
-        if color_scheme == "publication":
-            plt.fill_between(xx, yy, where=mask_forward, facecolor='0.9', interpolate=True)
-            plt.fill_between(xx, yy, where=mask_reverse, facecolor='0.9', interpolate=True)
-        else:
-            plt.fill_between(xx, yy, where=mask_forward, color="red", alpha=0.3, interpolate=True)
-            plt.fill_between(xx, yy, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
-    else:
-        plt.plot(x_sorted, y_sorted, color="black")  # PMF curve
-        mask_forward = (x_sorted >= results["IS"]) & (x_sorted <= results["TS"])
-        mask_reverse = (x_sorted >= results["TS"]) & (x_sorted <= results["FS"])
-        if color_scheme == "publication":
-            plt.fill_between(x_sorted, y_sorted, where=mask_forward, facecolor='0.9', interpolate=True)
-            plt.fill_between(x_sorted, y_sorted, where=mask_reverse, facecolor='0.9', interpolate=True)
-        else:
-            plt.fill_between(x_sorted, y_sorted, where=mask_forward, color="red", alpha=0.3, interpolate=True)
-            plt.fill_between(x_sorted, y_sorted, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
 
+    # Determine which data to use for plotting and filling
+    if plot_spline:
+        # evaluate PCHIP spline on a fine grid for smooth curves
+        spline = PchipInterpolator(x_sorted, y_sorted)
+        xx = np.linspace(x_sorted[0], x_sorted[-1], 500)
+        yy = spline(xx)
+        x_plot = xx
+        y_plot = yy
+    else:
+        x_plot = x_sorted
+        y_plot = y_sorted
+
+    # Plot the line
+    plt.plot(x_plot, y_plot, color="black")
+
+    # Plot error bars using the original raw data points
     plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
+
+    # Fill areas under the curve between IS-TS and TS-FS
+    # Use the same data (spline or original) for consistent visualization
+    mask_forward = (x_plot >= results["IS"]) & (x_plot <= results["TS"])
+    mask_reverse = (x_plot >= results["TS"]) & (x_plot <= results["FS"])
+    if color_scheme == "publication":
+        plt.fill_between(x_plot, y_plot, where=mask_forward, facecolor='0.9', interpolate=True)
+        plt.fill_between(x_plot, y_plot, where=mask_reverse, facecolor='0.9', interpolate=True)
+    else:  # presentation style
+        plt.fill_between(x_plot, y_plot, where=mask_forward, color="red", alpha=0.3, interpolate=True)
+        plt.fill_between(x_plot, y_plot, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
 
     if annotate:
         # Plot markers for IS, TS, FS and annotate them with arrow and rectangular text box

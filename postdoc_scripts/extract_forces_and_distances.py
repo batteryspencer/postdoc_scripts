@@ -54,7 +54,7 @@ for segment in sorted(os.listdir('.')):
         seg_path = os.path.join('.', segment)
 
         # Read the VASP files in the segment folder
-        atoms_list = read(os.path.join(seg_path, 'vasprun.xml'), index=':')
+        atoms_list = read(os.path.join(seg_path, 'OUTCAR'), index=':')
         
         for atoms in atoms_list:
             total_force_projection = 0

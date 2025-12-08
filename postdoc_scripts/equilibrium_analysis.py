@@ -65,64 +65,6 @@ def compute_stability_metrics(production_series, window_sizes, analysis_window_p
         mean_energy = analysis_data.mean()
         is_stable = fluctuation <= stability_threshold
         metrics['sigma'][window_ps] = (mean_energy, fluctuation, is_stable)
-    # Compute drift slope on the moving-average curve using the first window size
-    w0 = window_sizes[0]
-    ma_curve = production_series.rolling(window=w0).mean().dropna()
-    # Convert index to time in ps
-    times_ma = ma_curve.index * (timestep_fs / PS_TO_FS)
-    drift_result = linregress(times_ma, ma_curve.values)
-    metrics['drift_slope'] = drift_result.slope
-    metrics['drift_r2'] = drift_result.rvalue**2
-    metrics['drift_stderr'] = drift_result.stderr
-    return metrics
-
-def detect_equilibration(values_series, stability_threshold, timestep_fs):
-    """
-    Determine whether the system equilibrated via block-mean overlap.
-    Returns (eq_detected: bool, equil_time_ps: float or None).
-    """
-    default_block_size = len(values_series) // 10
-    num_blocks = len(values_series) // default_block_size
-    block_means = []
-    for i in range(num_blocks):
-        blk = values_series[i*default_block_size:(i+1)*default_block_size]
-        block_means.append(blk.mean())
-    eq_block = next(
-        (i for i in range(1, len(block_means))
-         if all(abs(block_means[j] - block_means[j-1]) <= stability_threshold
-                for j in range(i, len(block_means)))),
-        None
-    )
-    if eq_block is None:
-        return False, None
-    equil_time_ps = eq_block * default_block_size * timestep_fs / PS_TO_FS
-    return True, equil_time_ps
-
-def compute_stability_metrics(production_series, window_sizes, analysis_window_ps, stability_threshold, timestep_fs):
-    """
-    Compute moving-average fluctuations and drift slope for the production series.
-    Returns a dict with keys:
-      'sigma': {window_ps: (mean, fluctuation, is_stable)},
-      'drift_slope': float,
-      'drift_r2': float,
-      'drift_stderr': float
-    """
-    metrics = {'sigma': {}}
-    # convert to ps
-    steps_per_ps = PS_TO_FS / timestep_fs
-    # Determine dynamic window length
-    production_len_ps = len(production_series) * (timestep_fs / PS_TO_FS)
-    max_window_ps = min(analysis_window_ps, production_len_ps)
-    dynamic_window_steps = int(max_window_ps * PS_TO_FS / timestep_fs)
-    # Compute σ for each moving-average window
-    for w in window_sizes:
-        window_ps = w / steps_per_ps
-        rolling_mean = production_series.rolling(window=w).mean().dropna()
-        analysis_data = rolling_mean.iloc[-dynamic_window_steps:]
-        fluctuation = analysis_data.std()
-        mean_energy = analysis_data.mean()
-        is_stable = fluctuation <= stability_threshold
-        metrics['sigma'][window_ps] = (mean_energy, fluctuation, is_stable)
     # Compute drift slope
     times_prod = np.arange(len(production_series)) * (timestep_fs / PS_TO_FS)
     drift_result = linregress(times_prod, production_series.values)
@@ -592,7 +534,7 @@ def estimate_autocorrelation_time(acf, timestep=1):
         return len(acf) * timestep
     return indices_below[0] * timestep
 
-def plot_autocorrelation(values, ylabel, timestep_fs):
+def plot_autocorrelation(values, ylabel):
     plt.figure(figsize=(10, 6))
     acf = autocorrelation(values)
     steps = range(len(acf))

@@ -387,12 +387,15 @@ def test_energy_stability(values, window_size, analysis_window_ps=5, stability_t
 
     # --------- Report writing after plotting ---------
     if eq_detected:
+        # Calculate the actual window size in ps for reporting
+        steps_per_ps_report = PS_TO_FS / timestep_fs
+        window_ps_report = window_sizes[0] / steps_per_ps_report
         with open('equilibrium_analysis_report.txt', 'a') as file:
             file.write("\n=== Equilibration Status ===\n")
             file.write(f"Equilibration detected at {equil_time_ps:.2f} ps.\n")
             file.write(f"Production window: {max_prod_ps:.2f} ps\n")
             file.write(f"  • Drift slope: {metrics['drift_slope']:.4g} eV/ps\n")
-            file.write(f"  • σ (3 ps MA window): {metrics['sigma'][3.0][1]:.2f} eV\n")
+            file.write(f"  • σ ({window_ps_report:.1f} ps MA window): {metrics['sigma'][window_ps_report][1]:.2f} eV\n")
             file.write("============================\n\n")
 
     # Write machine-readable JSON report with rounded values

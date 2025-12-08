@@ -9,7 +9,8 @@
 ##SBATCH --tasks-per-node=128  # max: 128
 ##SBATCH --cpus-per-task=1
 ##SBATCH --mem=500G  # max: 500 GB
-#SBATCH -A standby
+#SBATCH --partition=cpu
+#SBATCH -A jgreeley
 #SBATCH --time=1:00:00  # max: (04:00:00 for standby, 14-00:00:00 for jgreeley)
 #SBATCH --mail-user=pasumarv@purdue.edu
 #SBATCH --mail-type=END

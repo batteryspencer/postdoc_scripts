@@ -161,82 +161,96 @@ def calculate_pmf(x, y, std_dev):
             else:
                 raw_intercepts.append((x_cross, "other"))
 
-    # Identify TS from raw intercepts (should always exist since data spans TS)
+    # Identify TS from raw intercepts
     ts_candidates = [xi for xi, typ in raw_intercepts if typ == "TS"]
+    ts_val = None
+    no_ts_found = False
+
     if ts_candidates:
         if len(ts_candidates) > 1:
             print(f"Warning: Multiple TS candidates found at {[f'{x:.3f}' for x in ts_candidates]}. Using first one at {ts_candidates[0]:.3f} Å.")
         ts_val = ts_candidates[0]
     else:
-        raise ValueError("TS intercept (negative-to-positive crossing) not found in raw data.")
+        # No TS crossing found - switch to simple integration mode
+        no_ts_found = True
+        print("Note: No TS intercept (negative-to-positive crossing) found in data.")
+        print("      Computing free energy change over the full data range instead.")
 
-    # Classify remaining intercepts as IS and FS based on their relation to TS
-    is_val = None
-    fs_val = None
-    for xi, typ in raw_intercepts:
-        if typ != "TS":
-            if xi < ts_val:
-                # For IS, choose the intercept closest to TS
-                if is_val is None or (ts_val - xi) < (ts_val - is_val):
-                    is_val = xi
-            elif xi > ts_val:
-                if fs_val is None or (xi - ts_val) < (fs_val - ts_val):
-                    fs_val = xi
-
-    # Extrapolate if IS or FS is missing
+    # Sort raw data
     x_sorted_raw = np.sort(x)
     y_sorted_raw = np.array(y)[np.argsort(x)]
 
-    if is_val is None:
-        # Extrapolate on the left side using a polynomial fit
-        print("Warning: IS (initial state) intercept not found in raw data. Attempting polynomial extrapolation.")
-        left_mask = x_sorted_raw < ts_val
-        if np.sum(left_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
-            x_left = x_sorted_raw[left_mask]
-            y_left = y_sorted_raw[left_mask]
-            n_points = min(MAX_POINTS_FOR_FIT, len(x_left))
-            x_fit = x_left[:n_points]
-            y_fit = y_left[:n_points]
-            coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
-            roots = np.roots(coeffs)
-            # Consider only roots less than ts_val and less than the minimum fitted x value
-            real_roots = roots[np.isreal(roots)].real
-            candidates = real_roots[(real_roots < ts_val) & (real_roots < x_fit[0])]
-            if len(candidates) > 0:
-                is_val = candidates[np.argmin(np.abs(ts_val - candidates))]
-                print(f"  Extrapolated IS to {is_val:.3f} Å using {n_points} data points.")
-
-    if fs_val is None:
-        # Extrapolate on the right side using a polynomial fit
-        print("Warning: FS (final state) intercept not found in raw data. Attempting polynomial extrapolation.")
-        right_mask = x_sorted_raw > ts_val
-        if np.sum(right_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
-            x_right = x_sorted_raw[right_mask]
-            y_right = y_sorted_raw[right_mask]
-            n_points = min(MAX_POINTS_FOR_FIT, len(x_right))
-            x_fit = x_right[-n_points:]
-            y_fit = y_right[-n_points:]
-            coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
-            roots = np.roots(coeffs)
-            real_roots = roots[np.isreal(roots)].real
-            # Consider only roots greater than ts_val and greater than the maximum fitted x value
-            candidates = real_roots[(real_roots > ts_val) & (real_roots > x_fit[-1])]
-            if len(candidates) > 0:
-                fs_val = candidates[np.argmin(np.abs(candidates - ts_val))]
-                print(f"  Extrapolated FS to {fs_val:.3f} Å using {n_points} data points.")
-
-    if is_val is None:
+    # Handle no-TS case: just use data endpoints
+    if no_ts_found:
         is_val = x_sorted_raw[0]
-        print(f"  Extrapolation failed. Using leftmost data point at {is_val:.3f} Å as IS (may not be at zero force).")
-    if fs_val is None:
         fs_val = x_sorted_raw[-1]
-        print(f"  Extrapolation failed. Using rightmost data point at {fs_val:.3f} Å as FS (may not be at zero force).")
+        print(f"      Using data endpoints: IS = {is_val:.2f} Å, FS = {fs_val:.2f} Å")
+    else:
+        # Classify remaining intercepts as IS and FS based on their relation to TS
+        is_val = None
+        fs_val = None
+        for xi, typ in raw_intercepts:
+            if typ != "TS":
+                if xi < ts_val:
+                    # For IS, choose the intercept closest to TS
+                    if is_val is None or (ts_val - xi) < (ts_val - is_val):
+                        is_val = xi
+                elif xi > ts_val:
+                    if fs_val is None or (xi - ts_val) < (fs_val - ts_val):
+                        fs_val = xi
+
+        # Extrapolate if IS or FS is missing
+        if is_val is None:
+            # Extrapolate on the left side using a polynomial fit
+            print("Warning: IS (initial state) intercept not found in raw data. Attempting polynomial extrapolation.")
+            left_mask = x_sorted_raw < ts_val
+            if np.sum(left_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
+                x_left = x_sorted_raw[left_mask]
+                y_left = y_sorted_raw[left_mask]
+                n_points = min(MAX_POINTS_FOR_FIT, len(x_left))
+                x_fit = x_left[:n_points]
+                y_fit = y_left[:n_points]
+                coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
+                roots = np.roots(coeffs)
+                # Consider only roots less than ts_val and less than the minimum fitted x value
+                real_roots = roots[np.isreal(roots)].real
+                candidates = real_roots[(real_roots < ts_val) & (real_roots < x_fit[0])]
+                if len(candidates) > 0:
+                    is_val = candidates[np.argmin(np.abs(ts_val - candidates))]
+                    print(f"  Extrapolated IS to {is_val:.3f} Å using {n_points} data points.")
+
+        if fs_val is None:
+            # Extrapolate on the right side using a polynomial fit
+            print("Warning: FS (final state) intercept not found in raw data. Attempting polynomial extrapolation.")
+            right_mask = x_sorted_raw > ts_val
+            if np.sum(right_mask) >= MIN_POINTS_FOR_EXTRAPOLATION:
+                x_right = x_sorted_raw[right_mask]
+                y_right = y_sorted_raw[right_mask]
+                n_points = min(MAX_POINTS_FOR_FIT, len(x_right))
+                x_fit = x_right[-n_points:]
+                y_fit = y_right[-n_points:]
+                coeffs = np.polyfit(x_fit, y_fit, POLY_ORDER)
+                roots = np.roots(coeffs)
+                real_roots = roots[np.isreal(roots)].real
+                # Consider only roots greater than ts_val and greater than the maximum fitted x value
+                candidates = real_roots[(real_roots > ts_val) & (real_roots > x_fit[-1])]
+                if len(candidates) > 0:
+                    fs_val = candidates[np.argmin(np.abs(candidates - ts_val))]
+                    print(f"  Extrapolated FS to {fs_val:.3f} Å using {n_points} data points.")
+
+        if is_val is None:
+            is_val = x_sorted_raw[0]
+            print(f"  Extrapolation failed. Using leftmost data point at {is_val:.3f} Å as IS (may not be at zero force).")
+        if fs_val is None:
+            fs_val = x_sorted_raw[-1]
+            print(f"  Extrapolation failed. Using rightmost data point at {fs_val:.3f} Å as FS (may not be at zero force).")
 
     # Insert the intercepts into the data for integration
     # Only extend with points that are not already present in x
     new_points = []
-    for pt in [is_val, ts_val, fs_val]:
-        if not np.any(np.isclose(x, pt)):
+    intercepts_to_add = [is_val, fs_val] if no_ts_found else [is_val, ts_val, fs_val]
+    for pt in intercepts_to_add:
+        if pt is not None and not np.any(np.isclose(x, pt)):
             new_points.append(pt)
     x_extended = np.concatenate((x, np.array(new_points)))
     y_extended = np.concatenate((y, np.zeros(len(new_points))))
@@ -260,29 +274,35 @@ def calculate_pmf(x, y, std_dev):
     spline = PchipInterpolator(x_sorted, y_sorted)
     anti = spline.antiderivative()
 
-    # Barrier and reaction energies via spline antiderivative
     # PMF(x) = -integral(F(x)dx), so:
-    # Forward barrier = PMF(TS) - PMF(IS) = -(anti(TS) - anti(IS))
-    # Backward barrier = PMF(TS) - PMF(FS) = -(anti(TS) - anti(FS))
     # Delta G = PMF(FS) - PMF(IS) = -(anti(FS) - anti(IS))
-    # These should satisfy: Forward - Backward = Delta G
-    forward_barrier = -(anti(ts_val) - anti(is_val))
-    backward_barrier = -(anti(ts_val) - anti(fs_val))
     delta_G = -(anti(fs_val) - anti(is_val))
 
-    # Validate that barriers are positive (sanity check)
-    if forward_barrier < 0:
-        raise ValueError(f"Negative forward barrier ({forward_barrier:.3f} eV) detected. Check TS identification and data quality.")
-    if backward_barrier < 0:
-        raise ValueError(f"Negative backward barrier ({backward_barrier:.3f} eV) detected. Check TS identification and data quality.")
+    # Initialize barrier values
+    forward_barrier = None
+    backward_barrier = None
+    forward_std = None
+    backward_std = None
 
-    # Verify thermodynamic consistency: Forward - Backward should equal Delta G
-    consistency_check = forward_barrier - backward_barrier - delta_G
-    if abs(consistency_check) > 0.01:  # tolerance of 0.01 eV
-        print(f"Warning: Thermodynamic inconsistency detected. Forward - Backward - Delta G = {consistency_check:.4f} eV (should be ~0)")
+    if not no_ts_found:
+        # Forward barrier = PMF(TS) - PMF(IS) = -(anti(TS) - anti(IS))
+        # Backward barrier = PMF(TS) - PMF(FS) = -(anti(TS) - anti(FS))
+        # These should satisfy: Forward - Backward = Delta G
+        forward_barrier = -(anti(ts_val) - anti(is_val))
+        backward_barrier = -(anti(ts_val) - anti(fs_val))
+
+        # Validate that barriers are positive (sanity check)
+        if forward_barrier < 0:
+            raise ValueError(f"Negative forward barrier ({forward_barrier:.3f} eV) detected. Check TS identification and data quality.")
+        if backward_barrier < 0:
+            raise ValueError(f"Negative backward barrier ({backward_barrier:.3f} eV) detected. Check TS identification and data quality.")
+
+        # Verify thermodynamic consistency: Forward - Backward should equal Delta G
+        consistency_check = forward_barrier - backward_barrier - delta_G
+        if abs(consistency_check) > 0.01:  # tolerance of 0.01 eV
+            print(f"Warning: Thermodynamic inconsistency detected. Forward - Backward - Delta G = {consistency_check:.4f} eV (should be ~0)")
 
     # Error propagation via bootstrap sampling over the spline fits
-    # This approach samples force uncertainties AND allows intercept positions to vary
     N_boot = 2000
     rng = np.random.default_rng()
     areas_fwd = []
@@ -294,34 +314,39 @@ def calculate_pmf(x, y, std_dev):
         # Sample new force values from their uncertainties
         y_samp = rng.normal(y_sorted, std_sorted)
         spline_s = PchipInterpolator(x_sorted, y_samp)
-
-        # Find intercepts for this bootstrap sample (allows TS position to vary)
-        is_boot, ts_boot, fs_boot = find_intercepts_from_spline(
-            spline_s, x_sorted[0], x_sorted[-1], n_eval=1000
-        )
-
-        # Fall back to original intercepts if bootstrap sample doesn't have clear crossings
-        if ts_boot is None:
-            n_failed += 1
-            ts_boot = ts_val
-        if is_boot is None:
-            is_boot = is_val
-        if fs_boot is None:
-            fs_boot = fs_val
-
-        # Integrate using bootstrap-specific intercepts
         anti_s = spline_s.antiderivative()
-        areas_fwd.append(-(anti_s(ts_boot) - anti_s(is_boot)))
-        areas_bwd.append(-(anti_s(ts_boot) - anti_s(fs_boot)))
-        areas_dG.append(-(anti_s(fs_boot) - anti_s(is_boot)))
 
-    forward_std = np.std(areas_fwd, ddof=1)
-    backward_std = np.std(areas_bwd, ddof=1)
+        if no_ts_found:
+            # Simple integration without TS
+            areas_dG.append(-(anti_s(fs_val) - anti_s(is_val)))
+        else:
+            # Find intercepts for this bootstrap sample (allows TS position to vary)
+            is_boot, ts_boot, fs_boot = find_intercepts_from_spline(
+                spline_s, x_sorted[0], x_sorted[-1], n_eval=1000
+            )
+
+            # Fall back to original intercepts if bootstrap sample doesn't have clear crossings
+            if ts_boot is None:
+                n_failed += 1
+                ts_boot = ts_val
+            if is_boot is None:
+                is_boot = is_val
+            if fs_boot is None:
+                fs_boot = fs_val
+
+            # Integrate using bootstrap-specific intercepts
+            areas_fwd.append(-(anti_s(ts_boot) - anti_s(is_boot)))
+            areas_bwd.append(-(anti_s(ts_boot) - anti_s(fs_boot)))
+            areas_dG.append(-(anti_s(fs_boot) - anti_s(is_boot)))
+
     delta_G_std = np.std(areas_dG, ddof=1)
 
-    # Report if any bootstrap samples failed to find TS
-    if n_failed > 0:
-        print(f"Note: {n_failed}/{N_boot} bootstrap samples failed to find TS crossing and used original TS position.")
+    if not no_ts_found:
+        forward_std = np.std(areas_fwd, ddof=1)
+        backward_std = np.std(areas_bwd, ddof=1)
+        # Report if any bootstrap samples failed to find TS
+        if n_failed > 0:
+            print(f"Note: {n_failed}/{N_boot} bootstrap samples failed to find TS crossing and used original TS position.")
 
     return {
         "x_sorted": x_sorted,
@@ -335,20 +360,30 @@ def calculate_pmf(x, y, std_dev):
         "Forward Barrier Std": forward_std,
         "Backward Barrier Std": backward_std,
         "Delta G": delta_G,
-        "Delta G Std": delta_G_std
+        "Delta G Std": delta_G_std,
+        "no_ts_found": no_ts_found
     }
 
 def format_results(results):
-    results_string = 'Activation Barriers (Area under the curve):\n'
-    if "Forward Barrier" in results:
-        results_string += f"Forward Barrier: {results['Forward Barrier']:.2f} ± {results['Forward Barrier Std']:.2f} eV\n"
-    if "Backward Barrier" in results:
-        results_string += f"Reverse Barrier: {results['Backward Barrier']:.2f} ± {results['Backward Barrier Std']:.2f}  eV\n"
-    results_string += f"Free Energy of Reaction (ΔG): {results['Delta G']:.2f} ± {results['Delta G Std']:.2f} eV\n"
+    no_ts = results.get("no_ts_found", False)
 
-    results_string += "\nEquilibrium Bond Distances: \n"
+    if no_ts:
+        results_string = 'Free Energy Analysis (no transition state detected):\n'
+        results_string += f"Free Energy Change (ΔG): {results['Delta G']:.2f} ± {results['Delta G Std']:.2f} eV\n"
+        results_string += "\nNote: No zero crossing (TS) found in force data.\n"
+        results_string += "      Barriers cannot be computed without a transition state.\n"
+    else:
+        results_string = 'Activation Barriers (Area under the curve):\n'
+        if results.get("Forward Barrier") is not None:
+            results_string += f"Forward Barrier: {results['Forward Barrier']:.2f} ± {results['Forward Barrier Std']:.2f} eV\n"
+        if results.get("Backward Barrier") is not None:
+            results_string += f"Reverse Barrier: {results['Backward Barrier']:.2f} ± {results['Backward Barrier Std']:.2f}  eV\n"
+        results_string += f"Free Energy of Reaction (ΔG): {results['Delta G']:.2f} ± {results['Delta G Std']:.2f} eV\n"
+
+    results_string += "\nBond Distances:\n"
     results_string += f"Initial State: {results['IS']:.2f} Å\n"
-    results_string += f"Transition State: {results['TS']:.2f} Å\n"
+    if results['TS'] is not None:
+        results_string += f"Transition State: {results['TS']:.2f} Å\n"
     results_string += f"Final State: {results['FS']:.2f} Å\n"
     return results_string
 
@@ -376,30 +411,42 @@ def plot_pmf(results, x, y, std_dev, annotate=True, color_scheme="presentation",
     # Plot error bars using the original raw data points
     plt.errorbar(x, y, yerr=std_dev, fmt='o', color="black", ecolor='black', capsize=3.5)
 
-    # Fill areas under the curve between IS-TS and TS-FS
+    # Fill areas under the curve
     # Use the same data (spline or original) for consistent visualization
-    mask_forward = (x_plot >= results["IS"]) & (x_plot <= results["TS"])
-    mask_reverse = (x_plot >= results["TS"]) & (x_plot <= results["FS"])
-    if color_scheme == "publication":
-        plt.fill_between(x_plot, y_plot, where=mask_forward, facecolor='0.9', interpolate=True)
-        plt.fill_between(x_plot, y_plot, where=mask_reverse, facecolor='0.9', interpolate=True)
-    else:  # presentation style
-        plt.fill_between(x_plot, y_plot, where=mask_forward, color="red", alpha=0.3, interpolate=True)
-        plt.fill_between(x_plot, y_plot, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
+    no_ts = results.get("no_ts_found", False)
+
+    if no_ts:
+        # No TS found: fill entire region from IS to FS with single color
+        mask_full = (x_plot >= results["IS"]) & (x_plot <= results["FS"])
+        if color_scheme == "publication":
+            plt.fill_between(x_plot, y_plot, where=mask_full, facecolor='0.9', interpolate=True)
+        else:
+            plt.fill_between(x_plot, y_plot, where=mask_full, color="blue", alpha=0.3, interpolate=True)
+    else:
+        # TS found: fill IS-TS and TS-FS separately
+        mask_forward = (x_plot >= results["IS"]) & (x_plot <= results["TS"])
+        mask_reverse = (x_plot >= results["TS"]) & (x_plot <= results["FS"])
+        if color_scheme == "publication":
+            plt.fill_between(x_plot, y_plot, where=mask_forward, facecolor='0.9', interpolate=True)
+            plt.fill_between(x_plot, y_plot, where=mask_reverse, facecolor='0.9', interpolate=True)
+        else:  # presentation style
+            plt.fill_between(x_plot, y_plot, where=mask_forward, color="red", alpha=0.3, interpolate=True)
+            plt.fill_between(x_plot, y_plot, where=mask_reverse, color="green", alpha=0.3, interpolate=True)
 
     if annotate:
-        # Plot markers for IS, TS, FS and annotate them with arrow and rectangular text box
+        # Plot markers for IS, TS (if exists), FS and annotate them
         plt.scatter(results["IS"], 0, marker="o", s=50, color="red", edgecolors="black", zorder=5)
         plt.annotate("IS", xy=(results["IS"], 0), xytext=(25, 25), textcoords="offset points",
                      arrowprops=dict(arrowstyle="->", color="black"),
                      bbox=dict(boxstyle="square", fc="white", ec="black", lw=0.5),
                      fontsize=LABEL_FONTSIZE - 4, color="black")
 
-        plt.scatter(results["TS"], 0, marker="o", s=50, color="red", edgecolors="black", zorder=5)
-        plt.annotate("TS", xy=(results["TS"], 0), xytext=(-25, 25), textcoords="offset points",
-                     arrowprops=dict(arrowstyle="->", color="black"),
-                     bbox=dict(boxstyle="square", fc="white", ec="black", lw=0.5),
-                     fontsize=LABEL_FONTSIZE - 4, color="black")
+        if results["TS"] is not None:
+            plt.scatter(results["TS"], 0, marker="o", s=50, color="red", edgecolors="black", zorder=5)
+            plt.annotate("TS", xy=(results["TS"], 0), xytext=(-25, 25), textcoords="offset points",
+                         arrowprops=dict(arrowstyle="->", color="black"),
+                         bbox=dict(boxstyle="square", fc="white", ec="black", lw=0.5),
+                         fontsize=LABEL_FONTSIZE - 4, color="black")
 
         plt.scatter(results["FS"], 0, marker="o", s=50, color="red", edgecolors="black", zorder=5)
         plt.annotate("FS", xy=(results["FS"], 0), xytext=(-25, -40), textcoords="offset points",

@@ -267,10 +267,16 @@ def test_energy_stability(values, window_size, analysis_window_ps=5, stability_t
         production_series = values_series
         max_prod_ps = len(production_series) * (timestep_fs / PS_TO_FS)
 
-    # Use the single window size provided
-    window_sizes = [window_size]
+    # Use the single window size provided, auto-adjust if too large
     if window_size > len(production_series):
-        raise ValueError(f"window_size ({window_size}) exceeds production data length ({len(production_series)})")
+        adjusted_window = len(production_series) // 2  # Use half the available data
+        print(f"Warning: window_size ({window_size}) exceeds production data length ({len(production_series)}). "
+              f"Automatically reducing to {adjusted_window} steps.")
+        with open('equilibrium_analysis_report.txt', 'a') as file:
+            file.write(f"Warning: window_size adjusted from {window_size} to {adjusted_window} steps "
+                       f"(production data has only {len(production_series)} steps).\n\n")
+        window_size = adjusted_window
+    window_sizes = [window_size]
 
     # Compute stability metrics on production_series
     metrics = compute_stability_metrics(production_series, window_sizes, analysis_window_ps, stability_threshold, timestep_fs)

@@ -41,9 +41,9 @@ function setup_environment {
     source /etc/profile.d/modules.sh
     module load intel/2024.1
     export I_MPI_FABRICS=shm:tcp
-    module try-load anaconda
     module load vasp/6.4.3-beef
     export VASP_PP_PATH=/depot/jgreeley/apps/vasp/vasppot/
+    source /depot/jgreeley/users/pasumarv/anaconda3/etc/profile.d/conda.sh
     conda activate ase_vasp
     if [ -f "generate_input_files.py" ] && [ ! -f "POSCAR" ] && [ ! -f "POTCAR" ] && [ ! -f "KPOINTS" ] && [ ! -f "INCAR" ]; then
         export ASE_VASP_VDW=/depot/jgreeley/users/pasumarv/lib/

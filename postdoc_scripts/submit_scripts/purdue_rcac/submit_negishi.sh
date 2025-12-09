@@ -40,9 +40,9 @@ function setup_environment {
     source /etc/profile.d/modules.sh
     module load intel/19.1.3.304 impi/2019.9.304 intel-mkl/2019.9.304 hdf5/1.13.2
     export I_MPI_FABRICS=shm:tcp
-    module try-load anaconda
     module load "jgreeley/vasp/5.4.4_beef"
     export VASP_PP_PATH=/depot/jgreeley/apps/vasp/vasppot/
+    source /depot/jgreeley/users/pasumarv/anaconda3/etc/profile.d/conda.sh
     conda activate ase_vasp
     if [ -f "generate_input_files.py" ] && [ ! -f "POSCAR" ] && [ ! -f "POTCAR" ] && [ ! -f "KPOINTS" ] && [ ! -f "INCAR" ]; then
         export ASE_VASP_VDW=/depot/jgreeley/users/pasumarv/lib/
@@ -179,10 +179,12 @@ function setup_simulation_directory {
 
     # Copy files to the segment directory
     if [ $seg -eq 1 ]; then
-        cp ../{INCAR,KPOINTS,POSCAR,POTCAR} . && [ $IS_MD_CALC -eq 1 ] && cp ../ICONST .
+        cp ../{INCAR,KPOINTS,POSCAR,POTCAR} .
+        [ $IS_MD_CALC -eq 1 ] && [ -f ../ICONST ] && cp ../ICONST .
     else
         cp ../seg$(printf "%0${number_padding}d" $((10#$seg - 1)))/CONTCAR POSCAR
-        cp ../{INCAR,KPOINTS,POTCAR} . && [ $IS_MD_CALC -eq 1 ] && cp ../ICONST .
+        cp ../{INCAR,KPOINTS,POTCAR} .
+        [ $IS_MD_CALC -eq 1 ] && [ -f ../ICONST ] && cp ../ICONST .
     fi
 }
 

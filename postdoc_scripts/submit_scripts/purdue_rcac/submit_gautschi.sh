@@ -95,10 +95,16 @@ function check_convergence_of_last_segment {
     echo "Checking segment $last_seg:"
     cd "seg"$last_seg
 
+    # Determine expected steps for this segment
+    local expected_steps=$SEGMENT_SIZE
+    if [ $((10#$last_seg)) -eq $num_segments ] && [ $((TOTAL_NSW % SEGMENT_SIZE)) -ne 0 ]; then
+        expected_steps=$((TOTAL_NSW % SEGMENT_SIZE))
+    fi
+
     # Check if OUTCAR is complete
     if [ -f "OUTCAR" ]; then
         completed_timesteps=$(grep -c LOOP+ "OUTCAR")
-        if [ "$completed_timesteps" -eq "$SEGMENT_SIZE" ]; then
+        if [ "$completed_timesteps" -eq "$expected_steps" ]; then
             # OUTCAR is complete
             outcar_complete=0
             echo "OUTCAR is complete."
@@ -278,12 +284,14 @@ function post_process {
     # Check if the calculation is complete
     if [ $IS_MD_CALC -eq 1 ] && [ $seg -eq $num_segments ]; then
         completed_timesteps=$(grep -c LOOP+ "OUTCAR")
+        # Reset outcar_complete to ensure we don't use stale value from check_segment_completion
+        outcar_complete=1
         if [ "$completed_timesteps" -eq "$SEGMENT_SIZE" ]; then
             # OUTCAR is complete
             outcar_complete=0
         fi
 
-        if check_contcar_completeness && [ "${outcar_complete:-1}" -eq 0 ]; then
+        if check_contcar_completeness && [ "$outcar_complete" -eq 0 ]; then
             echo -e "\nJob converged"
             job_convergence_status=0
         fi

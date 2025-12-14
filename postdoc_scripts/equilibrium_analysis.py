@@ -5,6 +5,7 @@ import re
 import numpy as np
 import pandas as pd
 import json
+from alive_progress import alive_bar
 
 # Analysis mode configurations
 # Each mode defines which analyses are enabled
@@ -216,9 +217,11 @@ def autocorrelation(x):
 def compute_vacf(velocities):
     num_steps, num_atoms, _ = velocities.shape
     vacf = np.zeros(num_steps)
-    for i in range(num_atoms):
-        for j in range(3):  # x, y, z components
-            vacf += autocorrelation(velocities[:, i, j])
+    with alive_bar(num_atoms, title='Computing VACF') as bar:
+        for i in range(num_atoms):
+            for j in range(3):  # x, y, z components
+                vacf += autocorrelation(velocities[:, i, j])
+            bar()
     vacf /= (num_atoms * 3)
     return vacf
 
@@ -263,6 +266,7 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(file_name)
+    plt.close()
 
 def test_energy_stability(values, window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png'):
     # Detect equilibration
@@ -428,6 +432,7 @@ def test_energy_stability(values, window_size, analysis_window_ps=5, stability_t
 
     plt.tight_layout()
     plt.savefig(file_name)
+    plt.close()
 
     # --------- Report writing after plotting ---------
     if eq_detected:
@@ -529,6 +534,7 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_t
     plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(file_name)
+    plt.close()
 
 def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=None, x_label='Block Number', y_label='Value', title='Block Averages and Std Dev', filename='block_averages_std_dev.png'):
     # Ensure there's enough data to form the requested number of blocks
@@ -569,6 +575,7 @@ def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=Non
     plt.ylim(y_min, y_max)  # Set the y-axis limits
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(filename)
+    plt.close()
 
 def estimate_autocorrelation_time(acf, timestep=1):
     """
@@ -594,6 +601,7 @@ def plot_autocorrelation(values, ylabel):
     plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(f'{ylabel.lower().replace(" ", "_")}_autocorrelation.png')
+    plt.close()
 
 def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='vacf.png'):
     plt.figure(figsize=(10, 6))
@@ -607,6 +615,7 @@ def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='va
     plt.tick_params(axis='both', which='major', labelsize=TICK_LABELSIZE, length=TICK_LENGTH_MAJOR, width=TICK_WIDTH_MAJOR)
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(filename)
+    plt.close()
 
 def run_analysis(mode, config, num_steps, window_size, energy_window_size):
     """Run all enabled analyses based on the provided configuration."""
@@ -624,16 +633,27 @@ def run_analysis(mode, config, num_steps, window_size, energy_window_size):
 
     # Load VDATCAR data if VACF analysis is enabled
     if config['vacf']:
+        print("Loading VDATCAR data...")
         vdatcar_path = 'VDATCAR'
         num_atoms = get_num_atoms_from_outcar(f'{seg_dirs[0]}/OUTCAR')
         total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
     # Read temperature and energy data from all segment directories
-    for seg_dir in seg_dirs:
-        outcar_path = os.path.join(seg_dir, 'OUTCAR')
-        if os.path.exists(outcar_path):
-            total_temperatures.extend(read_temperatures_from_outcar(outcar_path))
-            total_energies.extend(extract_total_energies(outcar_path))
+    # Calculate target time for progress display
+    target_time_ps = num_steps * timestep_fs / PS_TO_FS
+
+    with alive_bar(manual=True, title='Reading OUTCAR files') as bar:
+        for seg_dir in seg_dirs:
+            outcar_path = os.path.join(seg_dir, 'OUTCAR')
+            if os.path.exists(outcar_path):
+                total_temperatures.extend(read_temperatures_from_outcar(outcar_path))
+                total_energies.extend(extract_total_energies(outcar_path))
+            # Calculate current time based on steps read so far
+            current_steps = min(len(total_temperatures), num_steps)
+            current_time_ps = current_steps * timestep_fs / PS_TO_FS
+            progress_fraction = min(current_time_ps / target_time_ps, 1.0)
+            bar(progress_fraction)
+            bar.text(f'{current_time_ps:.1f} / {target_time_ps:.1f} ps')
 
     # Truncate data
     total_temperatures = total_temperatures[:num_steps]
@@ -645,36 +665,38 @@ def run_analysis(mode, config, num_steps, window_size, energy_window_size):
     with open('equilibrium_analysis_report.txt', 'w') as file:
         file.write(f"=== AIMD Analysis Report (Mode: {mode}) ===\n\n")
 
-    # Run enabled analyses
+    # Count enabled analyses for progress bar
+    analysis_steps = []
     if config['temperature_trend']:
-        plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
-
+        analysis_steps.append(('Temperature trend', lambda: plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')))
     if config['energy_trend']:
-        plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
-
+        analysis_steps.append(('Energy trend', lambda: plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')))
     if config['energy_stability']:
-        test_energy_stability(total_energies, energy_window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=timestep_fs, ylabel='Average Energy (eV)', file_name='stability_plot.png')
-
+        analysis_steps.append(('Energy stability', lambda: test_energy_stability(total_energies, energy_window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=timestep_fs, ylabel='Average Energy (eV)', file_name='stability_plot.png')))
     if config['fourier_temperature']:
-        plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
-
+        analysis_steps.append(('Fourier (temperature)', lambda: plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')))
     if config['temperature_blocks']:
-        compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')
-
+        analysis_steps.append(('Temperature blocks', lambda: compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')))
     if config['energy_blocks']:
-        compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='total_energy_block_averages.png')
-
+        analysis_steps.append(('Energy blocks', lambda: compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='total_energy_block_averages.png')))
     if config['temperature_autocorr']:
-        plot_autocorrelation(total_temperatures, 'Temperature')
-
+        analysis_steps.append(('Temperature autocorr', lambda: plot_autocorrelation(total_temperatures, 'Temperature')))
     if config['energy_autocorr']:
-        plot_autocorrelation(total_energies, 'Total Energy')
-
+        analysis_steps.append(('Energy autocorr', lambda: plot_autocorrelation(total_energies, 'Total Energy')))
     if config['vacf']:
-        vacf = compute_vacf(total_velocities)
-        plot_vacf(vacf, timestep_fs)
-        if config['fourier_vacf']:
-            plot_fourier_transform(vacf, timestep_fs, 'Amplitude', 'Fourier Transform of Velocity Fluctuations', 'velocity_fourier_transform.png', 'VACF')
+        def run_vacf():
+            vacf = compute_vacf(total_velocities)
+            plot_vacf(vacf, timestep_fs)
+            if config['fourier_vacf']:
+                plot_fourier_transform(vacf, timestep_fs, 'Amplitude', 'Fourier Transform of Velocity Fluctuations', 'velocity_fourier_transform.png', 'VACF')
+        analysis_steps.append(('VACF analysis', run_vacf))
+
+    # Run enabled analyses with progress bar
+    with alive_bar(len(analysis_steps), title='Running analyses', enrich_print=True) as bar:
+        for step_name, step_func in analysis_steps:
+            bar.text(f'-> {step_name}')
+            step_func()
+            bar()
 
 
 def main():

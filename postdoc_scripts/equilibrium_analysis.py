@@ -57,16 +57,15 @@ TICK_LENGTH_MAJOR = 8
 TICK_WIDTH_MAJOR = 1
 PS_TO_FS = 1000  # Conversion factor from picoseconds to femtoseconds
 
-def detect_equilibration(values_series, stability_threshold, timestep_fs):
+def detect_equilibration(values_series, num_blocks, stability_threshold, timestep_fs):
     """
     Determine whether the system equilibrated via block-mean overlap.
     Returns (eq_detected: bool, equil_time_ps: float or None).
     """
-    default_block_size = len(values_series) // 10
-    num_blocks = len(values_series) // default_block_size
+    block_size = len(values_series) // num_blocks
     block_means = []
     for i in range(num_blocks):
-        blk = values_series[i*default_block_size:(i+1)*default_block_size]
+        blk = values_series[i*block_size:(i+1)*block_size]
         block_means.append(blk.mean())
     eq_block = next(
         (i for i in range(1, len(block_means))
@@ -76,7 +75,7 @@ def detect_equilibration(values_series, stability_threshold, timestep_fs):
     )
     if eq_block is None:
         return False, None
-    equil_time_ps = eq_block * default_block_size * timestep_fs / PS_TO_FS
+    equil_time_ps = eq_block * block_size * timestep_fs / PS_TO_FS
     return True, equil_time_ps
 
 def compute_stability_metrics(production_series, window_sizes, analysis_window_ps, stability_threshold, timestep_fs):
@@ -225,13 +224,13 @@ def compute_vacf(velocities):
     vacf /= (num_atoms * 3)
     return vacf
 
-def plot_values(values, target_value, window_size, ylabel, title, file_name):
+def plot_values(values, target_value, window_size, ylabel, title, file_name, final_avg_steps):
     plt.figure(figsize=(10, 6))
     steps = range(len(values))
-    
+
     # Convert values to a Pandas Series to use rolling function
     values_series = pd.Series(values)
-    rolling_mean = values_series.rolling(window=window_size).mean()  # Adjust the window size as needed
+    rolling_mean = values_series.rolling(window=window_size).mean()
 
     # Plot the raw data in gray
     plt.plot(steps, values, label=ylabel, color='gray', alpha=0.5)
@@ -242,17 +241,17 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     mean_value = np.mean(values)
     std_dev = np.std(values)
 
-    # Compute the rolling mean of the final 2500 steps
-    if len(values) >= 2500:
-        final_2500_mean = np.mean(values[-2500:])
+    # Compute the mean of the final N steps
+    if len(values) >= final_avg_steps:
+        final_mean = np.mean(values[-final_avg_steps:])
     else:
-        final_2500_mean = np.mean(values)  # If less than 2500 steps, take the mean of the entire array
+        final_mean = np.mean(values)  # If less than final_avg_steps, take the mean of the entire array
 
-    # Print the mean, standard deviation, and final 2500 steps rolling mean to the report file
+    # Print the mean, standard deviation, and final steps mean to the report file
     with open(f'equilibrium_analysis_report.txt', 'a') as file:
         file.write(f"Mean {ylabel}: {mean_value:.2f}\n")
         file.write(f"Standard Deviation: {std_dev:.2f}\n")
-        file.write(f"Based on Final 2500 Steps, Equilibrated {ylabel}: {final_2500_mean:.2f}\n\n")
+        file.write(f"Based on Final {final_avg_steps} Steps, Equilibrated {ylabel}: {final_mean:.2f}\n\n")
 
     # Highlight the overall mean with a red dashed line
     plt.axhline(mean_value, color='r', linestyle='dashed', linewidth=1, label=f"Mean {ylabel}: {mean_value:.2f}")
@@ -268,10 +267,10 @@ def plot_values(values, target_value, window_size, ylabel, title, file_name):
     plt.savefig(file_name)
     plt.close()
 
-def test_energy_stability(values, window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png'):
+def test_energy_stability(values, window_size, num_blocks, analysis_window_ps, stability_threshold, timestep_fs, ylabel='Average Energy (eV)', file_name='stability_plot.png'):
     # Detect equilibration
     values_series = pd.Series(values)
-    eq_detected, equil_time_ps = detect_equilibration(values_series, stability_threshold, timestep_fs)
+    eq_detected, equil_time_ps = detect_equilibration(values_series, num_blocks, stability_threshold, timestep_fs)
 
     # Estimate energy autocorrelation time in steps
     acf = autocorrelation(values_series.values)
@@ -536,7 +535,7 @@ def plot_fourier_transform(values, timestep_fs, ylabel, title, file_name, data_t
     plt.savefig(file_name)
     plt.close()
 
-def compute_and_plot_block_averages(data_series, num_blocks=10, target_value=None, x_label='Block Number', y_label='Value', title='Block Averages and Std Dev', filename='block_averages_std_dev.png'):
+def compute_and_plot_block_averages(data_series, num_blocks, target_value, x_label, y_label, title, filename):
     # Ensure there's enough data to form the requested number of blocks
     if len(data_series) < num_blocks:
         print(f"Warning: Not enough data points ({len(data_series)}) for the requested number of blocks ({num_blocks}).")
@@ -617,7 +616,8 @@ def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='va
     plt.savefig(filename)
     plt.close()
 
-def run_analysis(mode, config, num_steps, window_size, energy_window_size):
+def run_analysis(mode, config, num_steps, window_size, energy_window_size,
+                 num_blocks, stability_threshold, analysis_window_ps, final_avg_steps):
     """Run all enabled analyses based on the provided configuration."""
     # Find all directories that start with 'seg' and are present in the current directory
     seg_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('seg')])
@@ -668,17 +668,17 @@ def run_analysis(mode, config, num_steps, window_size, energy_window_size):
     # Count enabled analyses for progress bar
     analysis_steps = []
     if config['temperature_trend']:
-        analysis_steps.append(('Temperature trend', lambda: plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')))
+        analysis_steps.append(('Temperature trend', lambda: plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png', final_avg_steps)))
     if config['energy_trend']:
-        analysis_steps.append(('Energy trend', lambda: plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')))
+        analysis_steps.append(('Energy trend', lambda: plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png', final_avg_steps)))
     if config['energy_stability']:
-        analysis_steps.append(('Energy stability', lambda: test_energy_stability(total_energies, energy_window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=timestep_fs, ylabel='Average Energy (eV)', file_name='stability_plot.png')))
+        analysis_steps.append(('Energy stability', lambda: test_energy_stability(total_energies, energy_window_size, num_blocks, analysis_window_ps, stability_threshold, timestep_fs, 'Average Energy (eV)', 'stability_plot.png')))
     if config['fourier_temperature']:
         analysis_steps.append(('Fourier (temperature)', lambda: plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')))
     if config['temperature_blocks']:
-        analysis_steps.append(('Temperature blocks', lambda: compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')))
+        analysis_steps.append(('Temperature blocks', lambda: compute_and_plot_block_averages(total_temperatures, num_blocks, target_temperature, 'Block Number', 'Temperature (K)', 'Block Averages and Std Dev of Temperature', 'temperature_block_averages.png')))
     if config['energy_blocks']:
-        analysis_steps.append(('Energy blocks', lambda: compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='total_energy_block_averages.png')))
+        analysis_steps.append(('Energy blocks', lambda: compute_and_plot_block_averages(total_energies, num_blocks, target_energy, 'Block Number', 'Energy (eV)', 'Block Averages and Std Dev of Total Energy', 'total_energy_block_averages.png')))
     if config['temperature_autocorr']:
         analysis_steps.append(('Temperature autocorr', lambda: plot_autocorrelation(total_temperatures, 'Temperature')))
     if config['energy_autocorr']:
@@ -704,11 +704,18 @@ def main():
     mode = 'equilibration'  # Options: 'heating', 'equilibration', 'production'
     num_steps = 30000
     window_size = 100           # Rolling window for temperature/energy plots
-    energy_window_size = 3000   # Window size for energy stability analysis
+    energy_window_size = 3000   # Window size for energy stability analysis (steps)
+
+    # Equilibration detection parameters
+    num_blocks = 10             # Number of blocks for block-overlap test
+    stability_threshold = 0.1  # Energy difference threshold between blocks (eV)
+    analysis_window_ps = 5.0    # Time window for stability analysis (ps)
+    final_avg_steps = 2500      # Steps to use for final equilibrated average
     # =================================================
 
     print(f"Running in '{mode}' mode")
-    run_analysis(mode, MODE_CONFIG[mode], num_steps, window_size, energy_window_size)
+    run_analysis(mode, MODE_CONFIG[mode], num_steps, window_size, energy_window_size,
+                 num_blocks, stability_threshold, analysis_window_ps, final_avg_steps)
     print("Analysis complete. Results saved to equilibrium_analysis_report.txt")
 
 if __name__ == "__main__":

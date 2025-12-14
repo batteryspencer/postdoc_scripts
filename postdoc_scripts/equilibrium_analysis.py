@@ -6,8 +6,46 @@ import numpy as np
 import pandas as pd
 import json
 
-# Define the number of steps to analyze
-NUM_STEPS_TO_ANALYZE = 30000
+# Analysis mode configurations
+# Each mode defines which analyses are enabled
+MODE_CONFIG = {
+    'heating': {
+        'temperature_trend': True,
+        'temperature_blocks': True,
+        'energy_trend': False,
+        'energy_stability': False,
+        'energy_blocks': False,
+        'temperature_autocorr': False,
+        'energy_autocorr': False,
+        'fourier_temperature': False,
+        'fourier_vacf': False,
+        'vacf': False,
+    },
+    'equilibration': {
+        'temperature_trend': True,
+        'temperature_blocks': True,
+        'energy_trend': True,
+        'energy_stability': True,
+        'energy_blocks': True,
+        'temperature_autocorr': False,
+        'energy_autocorr': False,
+        'fourier_temperature': False,
+        'fourier_vacf': False,
+        'vacf': False,
+    },
+    'production': {
+        'temperature_trend': True,
+        'temperature_blocks': True,
+        'energy_trend': True,
+        'energy_stability': True,
+        'energy_blocks': True,
+        'temperature_autocorr': True,
+        'energy_autocorr': True,
+        'fourier_temperature': True,
+        'fourier_vacf': True,
+        'vacf': True,
+    },
+}
 
 # Define font sizes and tick parameters as constants
 LABEL_FONTSIZE = 18
@@ -570,64 +608,86 @@ def plot_vacf(vacf, timestep_fs, ylabel='Velocity Autocorrelation', filename='va
     plt.legend(fontsize=LEGEND_FONTSIZE)
     plt.savefig(filename)
 
-def main():
+def run_analysis(mode, config, num_steps, window_size, energy_window_size):
+    """Run all enabled analyses based on the provided configuration."""
     # Find all directories that start with 'seg' and are present in the current directory
     seg_dirs = sorted([d for d in os.listdir('.') if os.path.isdir(d) and d.startswith('seg')])
-
-    # Prepend the current directory to the sorted list
     current_directory = os.getcwd()
     seg_dirs.insert(0, current_directory)
 
     total_temperatures = []
     total_energies = []
+    total_velocities = None
 
-    # Assume VDATCAR is in the current directory or a specified path
-    vdatcar_path = 'VDATCAR'  # Update this path if VDATCAR is in a different location
-    num_atoms = get_num_atoms_from_outcar(f'{seg_dirs[0]}/OUTCAR')
+    # Read timestep from INCAR
     timestep_fs = float([line.split('=')[-1].strip() for line in open(f'{seg_dirs[0]}/INCAR') if 'POTIM' in line][0])
-    total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
 
+    # Load VDATCAR data if VACF analysis is enabled
+    if config['vacf']:
+        vdatcar_path = 'VDATCAR'
+        num_atoms = get_num_atoms_from_outcar(f'{seg_dirs[0]}/OUTCAR')
+        total_velocities = read_velocities_from_vdatcar(vdatcar_path, num_atoms)
+
+    # Read temperature and energy data from all segment directories
     for seg_dir in seg_dirs:
         outcar_path = os.path.join(seg_dir, 'OUTCAR')
-
         if os.path.exists(outcar_path):
-            temperatures = read_temperatures_from_outcar(outcar_path)
-            energies = extract_total_energies(outcar_path)
+            total_temperatures.extend(read_temperatures_from_outcar(outcar_path))
+            total_energies.extend(extract_total_energies(outcar_path))
 
-            total_temperatures.extend(temperatures)
-            total_energies.extend(energies)
-
-    # Truncate the data to the number of steps we want to analyze
-    total_temperatures = total_temperatures[:NUM_STEPS_TO_ANALYZE]
-    total_energies = total_energies[:NUM_STEPS_TO_ANALYZE]
+    # Truncate data
+    total_temperatures = total_temperatures[:num_steps]
+    total_energies = total_energies[:num_steps]
     target_temperature = total_temperatures[0]
     target_energy = None
 
-    # Clear the report file
+    # Initialize report file
     with open('equilibrium_analysis_report.txt', 'w') as file:
-        pass
-    # Plotting temperature and energy trends
-    window_size = 100
-    plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
-    plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
-    energy_window_size = 3000
-    test_energy_stability(total_energies, energy_window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=1, ylabel='Average Energy (eV)', file_name='stability_plot.png')
+        file.write(f"=== AIMD Analysis Report (Mode: {mode}) ===\n\n")
 
-    # Plotting Fourier transform
-    plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
+    # Run enabled analyses
+    if config['temperature_trend']:
+        plot_values(total_temperatures, target_temperature, window_size, 'Temperature (K)', 'Temperature per Ionic Step Across Simulation', 'temperature_trend.png')
 
-    # Plotting block averages
-    compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')
-    compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='total_energy_block_averages.png')
+    if config['energy_trend']:
+        plot_values(total_energies, target_energy, window_size, 'Total Energy (eV)', 'Total Energy per Ionic Step Across Simulation', 'total_energy_trend.png')
 
-    # Plotting autocorrelation functions
-    plot_autocorrelation(total_temperatures, 'Temperature')
-    plot_autocorrelation(total_energies, 'Total Energy')
-    vacf = compute_vacf(total_velocities)
-    plot_vacf(vacf, timestep_fs)
+    if config['energy_stability']:
+        test_energy_stability(total_energies, energy_window_size, analysis_window_ps=5, stability_threshold=0.1, timestep_fs=timestep_fs, ylabel='Average Energy (eV)', file_name='stability_plot.png')
 
-    # Plotting Fourier transform
-    plot_fourier_transform(vacf, timestep_fs, 'Amplitude', 'Fourier Transform of Velocity Fluctuations', 'velocity_fourier_transform.png', 'VACF')
+    if config['fourier_temperature']:
+        plot_fourier_transform(total_temperatures, timestep_fs, 'Amplitude', 'Fourier Transform of Temperature Fluctuations', 'temperature_fourier_transform.png', 'Temperature Fluctuations')
+
+    if config['temperature_blocks']:
+        compute_and_plot_block_averages(total_temperatures, num_blocks=10, target_value=target_temperature, x_label='Block Number', y_label='Temperature (K)', title='Block Averages and Std Dev of Temperature', filename='temperature_block_averages.png')
+
+    if config['energy_blocks']:
+        compute_and_plot_block_averages(total_energies, num_blocks=10, target_value=target_energy, x_label='Block Number', y_label='Energy (eV)', title='Block Averages and Std Dev of Total Energy', filename='total_energy_block_averages.png')
+
+    if config['temperature_autocorr']:
+        plot_autocorrelation(total_temperatures, 'Temperature')
+
+    if config['energy_autocorr']:
+        plot_autocorrelation(total_energies, 'Total Energy')
+
+    if config['vacf']:
+        vacf = compute_vacf(total_velocities)
+        plot_vacf(vacf, timestep_fs)
+        if config['fourier_vacf']:
+            plot_fourier_transform(vacf, timestep_fs, 'Amplitude', 'Fourier Transform of Velocity Fluctuations', 'velocity_fourier_transform.png', 'VACF')
+
+
+def main():
+    # ================== USER INPUTS ==================
+    mode = 'heating'  # Options: 'heating', 'equilibration', 'production'
+    num_steps = 30000
+    window_size = 100           # Rolling window for temperature/energy plots
+    energy_window_size = 3000   # Window size for energy stability analysis
+    # =================================================
+
+    print(f"Running in '{mode}' mode")
+    run_analysis(mode, MODE_CONFIG[mode], num_steps, window_size, energy_window_size)
+    print("Analysis complete. Results saved to equilibrium_analysis_report.txt")
 
 if __name__ == "__main__":
     main()

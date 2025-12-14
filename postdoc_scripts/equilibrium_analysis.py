@@ -679,7 +679,7 @@ def run_analysis(mode, config, num_steps, window_size, energy_window_size):
 
 def main():
     # ================== USER INPUTS ==================
-    mode = 'heating'  # Options: 'heating', 'equilibration', 'production'
+    mode = 'equilibration'  # Options: 'heating', 'equilibration', 'production'
     num_steps = 30000
     window_size = 100           # Rolling window for temperature/energy plots
     energy_window_size = 3000   # Window size for energy stability analysis

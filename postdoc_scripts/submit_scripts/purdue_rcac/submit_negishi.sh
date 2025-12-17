@@ -86,6 +86,8 @@ function log_bad_nodes {
 function monitor_progress {
     local outcar_path="$1"
     local monitor_start_time=$(date +%s)
+    local prev_steps=0
+    local stall_count=0
 
     # Wait for grace period before first check (VASP needs time to initialize)
     sleep ${PROGRESS_GRACE_PERIOD_MIN}m
@@ -102,9 +104,13 @@ function monitor_progress {
             local expected_steps=$(( (elapsed_minutes * EXPECTED_STEPS_PER_MINUTE) ))
             local min_acceptable_steps=$(( expected_steps * MIN_PROGRESS_PERCENT / 100 ))
 
-            echo "[Monitor] Elapsed: ${elapsed_minutes}min, Steps: $current_steps, Min expected: $min_acceptable_steps"
+            # Calculate step delta since last check
+            local step_delta=$((current_steps - prev_steps))
+            local expected_delta=$((PROGRESS_CHECK_INTERVAL_MIN * EXPECTED_STEPS_PER_MINUTE * MIN_PROGRESS_PERCENT / 100))
 
-            # Check: Overall progress too slow
+            echo "[Monitor] Elapsed: ${elapsed_minutes}min, Steps: $current_steps (+$step_delta), Min expected: $min_acceptable_steps, Stall count: $stall_count/$MAX_STALL_CHECKS"
+
+            # Check 1: Overall progress too slow from start
             if [ "$current_steps" -lt "$min_acceptable_steps" ] && [ "$elapsed_minutes" -ge "$PROGRESS_GRACE_PERIOD_MIN" ]; then
                 echo "[Monitor] SLOW PROGRESS DETECTED! Steps: $current_steps, Expected at least: $min_acceptable_steps"
                 log_bad_nodes "slow_progress" "$current_steps" "$elapsed_minutes"
@@ -113,6 +119,26 @@ function monitor_progress {
                 scancel $SLURM_JOB_ID
                 exit 1
             fi
+
+            # Check 2: Job stalled (no/very few new steps since last check)
+            if [ "$step_delta" -lt "$expected_delta" ] && [ "$prev_steps" -gt 0 ]; then
+                stall_count=$((stall_count + 1))
+                echo "[Monitor] WARNING: Only $step_delta new steps (expected ~$expected_delta). Stall count: $stall_count/$MAX_STALL_CHECKS"
+
+                if [ "$stall_count" -ge "$MAX_STALL_CHECKS" ]; then
+                    echo "[Monitor] JOB STALLED! No meaningful progress for $((stall_count * PROGRESS_CHECK_INTERVAL_MIN)) minutes"
+                    log_bad_nodes "stalled" "$current_steps" "$elapsed_minutes"
+                    echo "[Monitor] Terminating stalled job..."
+                    kill $VASP_PID 2>/dev/null
+                    scancel $SLURM_JOB_ID
+                    exit 1
+                fi
+            else
+                # Reset stall count if progress resumed
+                stall_count=0
+            fi
+
+            prev_steps=$current_steps
         fi
 
         # Check every PROGRESS_CHECK_INTERVAL_MIN minutes
@@ -554,6 +580,11 @@ EXPECTED_STEPS_PER_MINUTE=7
 # Minimum acceptable progress as percentage of expected
 # 25% = tolerate up to 4x slower than expected before flagging
 MIN_PROGRESS_PERCENT=25
+
+# Number of consecutive stall checks before terminating
+# Detects jobs that start well then freeze mid-run
+# With 10 min interval, 3 checks = kill after 30 min of no progress
+MAX_STALL_CHECKS=3
 
 # --- Execute Main Logic ---
 main

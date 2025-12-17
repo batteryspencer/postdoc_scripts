@@ -4,14 +4,14 @@
 #SBATCH --job-name=new_submit_script
 #SBATCH --output=job_%j.out
 #SBATCH --error=job_%j.err
-#SBATCH --nodes=5
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=128  # max: 128
 ##SBATCH --tasks-per-node=128  # max: 128
 ##SBATCH --cpus-per-task=1
 ##SBATCH --mem=500G  # max: 500 GB
 #SBATCH --partition=cpu
 #SBATCH -A jgreeley
-#SBATCH --time=1:00:00  # max: (04:00:00 for standby, 14-00:00:00 for jgreeley)
+#SBATCH --time=04:00:00  # max: (04:00:00 for standby, 14-00:00:00 for jgreeley)
 #SBATCH --mail-user=pasumarv@purdue.edu
 #SBATCH --mail-type=END
 
@@ -64,6 +64,86 @@ function log_job_details {
     echo "Total nodes requested: $NUM_NODE"
     echo "Total CPUs for this jobs: nodes x ppn: $PROC_NUM"
     echo $SLURM_JOB_NODELIST > nodefile.$SLURM_JOB_ID
+}
+
+# Log bad nodes to a central file for tracking
+function log_bad_nodes {
+    local reason="$1"
+    local steps_completed="$2"
+    local elapsed_minutes="$3"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    local nodes=$(cat $SLURM_SUBMIT_DIR/nodefile.$SLURM_JOB_ID 2>/dev/null || echo "unknown")
+
+    # Ensure bad node log directory exists
+    mkdir -p "$(dirname "$BAD_NODE_LOG")"
+
+    # Log format: timestamp | job_id | nodes | directory | reason | steps | elapsed_min
+    echo "$timestamp | $SLURM_JOB_ID | $nodes | $PWD | $reason | steps=$steps_completed | elapsed=${elapsed_minutes}min" >> "$BAD_NODE_LOG"
+    echo "Bad node logged: $nodes (reason: $reason, steps: $steps_completed in ${elapsed_minutes}min)"
+}
+
+# Background progress monitor - checks if VASP is making expected progress
+function monitor_progress {
+    local outcar_path="$1"
+    local monitor_start_time=$(date +%s)
+
+    # Wait for grace period before first check (VASP needs time to initialize)
+    sleep ${PROGRESS_GRACE_PERIOD_MIN}m
+
+    while true; do
+        # Check if OUTCAR exists and count steps
+        if [ -f "$outcar_path" ]; then
+            local current_steps=$(grep -c LOOP+ "$outcar_path" 2>/dev/null || echo 0)
+            local current_time=$(date +%s)
+            local elapsed_seconds=$((current_time - monitor_start_time))
+            local elapsed_minutes=$((elapsed_seconds / 60))
+
+            # Calculate expected steps based on elapsed time
+            local expected_steps=$(( (elapsed_minutes * EXPECTED_STEPS_PER_MINUTE) ))
+            local min_acceptable_steps=$(( expected_steps * MIN_PROGRESS_PERCENT / 100 ))
+
+            echo "[Monitor] Elapsed: ${elapsed_minutes}min, Steps: $current_steps, Min expected: $min_acceptable_steps"
+
+            # Check: Overall progress too slow
+            if [ "$current_steps" -lt "$min_acceptable_steps" ] && [ "$elapsed_minutes" -ge "$PROGRESS_GRACE_PERIOD_MIN" ]; then
+                echo "[Monitor] SLOW PROGRESS DETECTED! Steps: $current_steps, Expected at least: $min_acceptable_steps"
+                log_bad_nodes "slow_progress" "$current_steps" "$elapsed_minutes"
+                echo "[Monitor] Terminating job to avoid wasting compute time..."
+                kill $VASP_PID 2>/dev/null
+                scancel $SLURM_JOB_ID
+                exit 1
+            fi
+        fi
+
+        # Check every PROGRESS_CHECK_INTERVAL_MIN minutes
+        sleep ${PROGRESS_CHECK_INTERVAL_MIN}m
+
+        # Safety: stop monitoring if we've been running too long (job should end naturally)
+        local total_elapsed=$(($(date +%s) - monitor_start_time))
+        if [ "$total_elapsed" -gt "$((EXPECTED_SEGMENT_RUNTIME_MIN * 60 * 2))" ]; then
+            echo "[Monitor] Exceeded 2x expected runtime, stopping monitor"
+            break
+        fi
+    done
+}
+
+# Start background progress monitor
+function start_progress_monitor {
+    local outcar_path="$1"
+    if [ "$ENABLE_PROGRESS_MONITOR" -eq 1 ]; then
+        echo "Starting progress monitor (grace period: ${PROGRESS_GRACE_PERIOD_MIN}min, check interval: ${PROGRESS_CHECK_INTERVAL_MIN}min)"
+        monitor_progress "$outcar_path" &
+        MONITOR_PID=$!
+    fi
+}
+
+# Stop background progress monitor
+function stop_progress_monitor {
+    if [ -n "$MONITOR_PID" ]; then
+        kill $MONITOR_PID 2>/dev/null
+        wait $MONITOR_PID 2>/dev/null
+        unset MONITOR_PID
+    fi
 }
 
 function check_contcar_completeness {
@@ -372,12 +452,29 @@ function main {
 
         setup_simulation_directory
 
+        # Determine OUTCAR path for monitoring
+        if [ $num_segments -eq 1 ]; then
+            outcar_monitor_path="$SLURM_SUBMIT_DIR/OUTCAR"
+        else
+            outcar_monitor_path="$PWD/OUTCAR"
+        fi
+
+        # Start progress monitor in background
+        start_progress_monitor "$outcar_monitor_path"
+
         # Run the VASP job:
         if [ $num_segments -eq 1 ]; then
-            srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE
+            srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE &
+            VASP_PID=$!
+            wait $VASP_PID
         else
-            srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE > job.out 2> job.err
+            srun -n $PROC_NUM --mpi=pmi2 $EXECUTABLE > job.out 2> job.err &
+            VASP_PID=$!
+            wait $VASP_PID
         fi
+
+        # Stop progress monitor
+        stop_progress_monitor
 
         post_process
 
@@ -415,7 +512,7 @@ function main {
 ####################################################
 
 # Define the total NSW
-TOTAL_NSW=6000
+TOTAL_NSW=10000
 # Set SEGMENT_SIZE to 0 for single-point calculations.
 SEGMENT_SIZE=1000
 
@@ -428,8 +525,35 @@ compute_bader_charges=0  # Set this to 0 if you don't want to run "bader CHGCAR"
 IS_MD_CALC=1  # Set this to 1 for MD calculations
 number_padding=2  # number padding for segment directories
 EXECUTABLE=vasp_std  # Define the VASP executable
-MAX_RESTARTS=0  # Set the maximum number of restarts here
-time_limit_min=30  # Set minimum additional time in minutes
+MAX_RESTARTS=20  # Set the maximum number of restarts here
+time_limit_min=10  # Set minimum additional time in minutes
+
+####################################################
+#         PROGRESS MONITORING SETTINGS             #
+####################################################
+# Enable/disable progress monitoring (1=enabled, 0=disabled)
+ENABLE_PROGRESS_MONITOR=1
+
+# Central log file for tracking bad nodes across all jobs
+BAD_NODE_LOG="/scratch/negishi/pasumarv/bad_nodes.log"
+
+# Grace period before first progress check (minutes)
+# VASP needs time to initialize - don't check too early
+PROGRESS_GRACE_PERIOD_MIN=20
+
+# How often to check progress after grace period (minutes)
+PROGRESS_CHECK_INTERVAL_MIN=10
+
+# Expected segment runtime in minutes (1000 steps in ~150 min = 2.5 hours)
+EXPECTED_SEGMENT_RUNTIME_MIN=150
+
+# Expected steps per minute - SET THIS BASED ON YOUR BENCHMARK
+# Example: 1000 steps / 150 min ≈ 6.7 steps/min (~9 s/step)
+EXPECTED_STEPS_PER_MINUTE=7
+
+# Minimum acceptable progress as percentage of expected
+# 25% = tolerate up to 4x slower than expected before flagging
+MIN_PROGRESS_PERCENT=25
 
 # --- Execute Main Logic ---
 main

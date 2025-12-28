@@ -96,7 +96,8 @@ function monitor_progress {
     while true; do
         # Check if OUTCAR exists and count steps
         if [ -f "$outcar_path" ]; then
-            local current_steps=$(grep -c LOOP+ "$outcar_path" 2>/dev/null || echo 0)
+            local current_steps=$(grep -c LOOP+ "$outcar_path" 2>/dev/null | head -1)
+            current_steps=${current_steps:-0}
             local current_time=$(date +%s)
             local elapsed_seconds=$((current_time - monitor_start_time))
             local elapsed_minutes=$((elapsed_seconds / 60))
@@ -422,7 +423,7 @@ function time_to_seconds {
     # Check if the time string contains a day part
     if [[ "$time_str" == *-* ]]; then
         IFS='-' read -r days time_str <<< "$time_str"
-        total_seconds=$((days * 86400))
+        total_seconds=$((10#$days * 86400))
     fi
 
     # Split the remaining time string and add hours, minutes, and seconds
@@ -438,7 +439,7 @@ function time_to_seconds {
         fi
     fi
 
-    total_seconds=$((total_seconds + hours * 3600 + minutes * 60 + seconds))
+    total_seconds=$((total_seconds + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds))
     echo $total_seconds
 }
 

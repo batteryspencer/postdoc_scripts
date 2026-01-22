@@ -28,6 +28,20 @@ def extract_runtimes(folder):
     skip = min(int(len(times) * 0.2), 20)
     return times[skip:]
 
+def check_ionic_steps_completed(folder):
+    """
+    Check if OUTCAR contains ionic step data (LOOP+ lines).
+    Returns the number of ionic steps completed.
+    """
+    import subprocess
+    outcar_path = f"{folder}/OUTCAR"
+    cmd = f'grep -c "LOOP+" "{outcar_path}" 2>/dev/null || echo "0"'
+    proc = subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True)
+    try:
+        return int(proc.stdout.strip())
+    except ValueError:
+        return 0
+
 def parse_combo_from_folder(name):
     """Extract (NCORE, NPAR, KPAR) from a folder name if present."""
     import re
@@ -72,6 +86,13 @@ def main():
     for folder in sorted(base.iterdir()):
         if not folder.is_dir():
             continue
+
+        # Check if ionic steps were actually executed
+        num_steps = check_ionic_steps_completed(folder.as_posix())
+        if num_steps == 0:
+            print(f"Warning: no ionic steps completed in {folder.name}")
+            continue
+
         times = extract_runtimes(folder.as_posix())
         if not times:
             print(f"Warning: no runtimes found in {folder.name}")

@@ -21,26 +21,64 @@ import matplotlib.pyplot as plt
 from glob import glob
 from collections import defaultdict
 from ase.io import read as ase_read
+from ase.data import covalent_radii, chemical_symbols
 
 # Import from existing script
-from constrained_force_stats import read_simulation_data, get_file_line_count
+from constrained_force_stats import (read_simulation_data, get_file_line_count,
+                                      find_histogram_peaks, find_closest_frames)
+
+
+def get_ase_bond_cutoff(element1, element2, mult=1.3):
+    """
+    Calculate bond cutoff using ASE's covalent radii.
+
+    This mimics how ASE GUI determines bonds for visualization.
+    The formula is: cutoff = (covalent_radius_1 + covalent_radius_2) * mult
+
+    ASE GUI typically uses mult ≈ 1.3 for bond visualization.
+
+    Parameters:
+        element1: Chemical symbol (e.g., 'C', 'H', 'Pt')
+        element2: Chemical symbol
+        mult: Multiplier for the sum of covalent radii (default 1.3)
+
+    Returns:
+        cutoff: Bond distance cutoff in Angstroms
+    """
+    idx1 = chemical_symbols.index(element1)
+    idx2 = chemical_symbols.index(element2)
+    base_cutoff = covalent_radii[idx1] + covalent_radii[idx2]
+    return base_cutoff * mult
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
 # Atom indices (0-based)
-C_INDEX = 0          # Carbon atom
-H_INDEX = 4          # Departing hydrogen atom
+C_INDEX = 1          # Carbon atom
+H_INDEX = 5          # Departing hydrogen atom
 
 # Pt atom indices - all surface Pt that could potentially bond
 # Adjust this list based on your slab structure
 # For a 3x3 surface, top layer typically has 9 atoms
 PT_INDICES = list(range(11, 56))  # Pt atoms at indices 11-55 (after 11 propane atoms)
 
-# Bonding cutoffs (Angstroms)
-C_PT_CUTOFF = 2.2     # C-Pt: captures top (~2.0), bridge (~2.2), hollow (~2.4)
-H_PT_CUTOFF = 1.9     # H-Pt: captures top (~1.55), bridge (~1.8), hollow (~2.0)
+# Bonding cutoff multiplier
+# ASE GUI uses approximately 1.3 for bond visualization
+# Formula: cutoff = (covalent_radius_A + covalent_radius_B) * BOND_MULT
+BOND_MULT = 1.3
+
+# Calculate cutoffs using ASE covalent radii (matching ASE GUI behavior)
+# These are computed dynamically from ASE's covalent_radii database
+C_PT_CUTOFF = get_ase_bond_cutoff('C', 'Pt', mult=BOND_MULT)
+H_PT_CUTOFF = get_ase_bond_cutoff('H', 'Pt', mult=BOND_MULT)
+C_H_CUTOFF = get_ase_bond_cutoff('C', 'H', mult=BOND_MULT)
+
+# Print derived cutoffs for reference
+print(f"ASE-derived bond cutoffs (mult={BOND_MULT}):")
+print(f"  C-Pt: {C_PT_CUTOFF:.3f} Å (covalent radii: C={covalent_radii[chemical_symbols.index('C')]:.3f}, Pt={covalent_radii[chemical_symbols.index('Pt')]:.3f})")
+print(f"  H-Pt: {H_PT_CUTOFF:.3f} Å (covalent radii: H={covalent_radii[chemical_symbols.index('H')]:.3f}, Pt={covalent_radii[chemical_symbols.index('Pt')]:.3f})")
+print(f"  C-H:  {C_H_CUTOFF:.3f} Å")
 
 # Constraint index
 CONSTRAINT_INDEX = 0
@@ -151,13 +189,13 @@ def analyze_trajectory_coordination(trajectory, c_idx, h_idx, pt_indices,
 def compute_category_statistics(forces, labels):
     """
     Compute force statistics for each category.
-    
+
     Returns:
         stats: dict mapping label to {mean, std, sem, count, fraction}
     """
     unique_labels = sorted(set(labels))
     stats = {}
-    
+
     total = len(forces)
     for label in unique_labels:
         mask = np.array([l == label for l in labels])
@@ -169,8 +207,78 @@ def compute_category_statistics(forces, labels):
             'count': len(f),
             'fraction': len(f) / total,
         }
-    
+
     return stats
+
+
+def analyze_peaks_by_category(forces, labels, frame_indices=None):
+    """
+    Detect histogram peaks for each coordination category.
+
+    Parameters:
+        forces: Array of force values
+        labels: List of category labels for each frame
+        frame_indices: Optional array of original frame indices (if None, uses 0-based)
+
+    Returns:
+        peak_analysis: dict mapping category to peak information
+    """
+    if frame_indices is None:
+        frame_indices = np.arange(len(forces))
+
+    unique_labels = sorted(set(labels))
+    peak_analysis = {}
+
+    for label in unique_labels:
+        mask = np.array([l == label for l in labels])
+        cat_forces = forces[mask]
+        cat_frame_indices = frame_indices[mask]
+
+        # Need enough data points for meaningful peak detection
+        if len(cat_forces) < 50:
+            peak_analysis[label] = {
+                'peaks': [],
+                'peak_frames': {},
+                'note': 'Insufficient data for peak detection'
+            }
+            continue
+
+        # Find peaks in this category's force distribution
+        peaks = find_histogram_peaks(cat_forces, bins=50)
+
+        # Find frames corresponding to each peak
+        peak_forces = [p[0] for p in peaks]
+
+        # Map back to original frame indices
+        peak_frames = {}
+        for peak_force in peak_forces:
+            tolerance = 0.1
+            close_mask = np.abs(cat_forces - peak_force) <= tolerance
+            close_frames = cat_frame_indices[close_mask]
+            # Store up to 5 representative frames
+            peak_frames[peak_force] = list(close_frames[:5])
+
+        peak_analysis[label] = {
+            'peaks': peaks,
+            'peak_frames': peak_frames,
+            'note': None
+        }
+
+    return peak_analysis
+
+
+def analyze_overall_peaks(forces):
+    """
+    Detect histogram peaks for the overall force distribution.
+
+    Returns:
+        peaks: list of (force, frequency) tuples
+        peak_frames: dict mapping peak force to list of frame indices
+    """
+    peaks = find_histogram_peaks(forces, bins=100)
+    peak_forces = [p[0] for p in peaks]
+    peak_frames = find_closest_frames(list(forces), peak_forces, tolerance=0.1)
+    return peaks, peak_frames
 
 
 # =============================================================================
@@ -449,8 +557,9 @@ def main():
     print(f"\nConfiguration:")
     print(f"  C atom index: {C_INDEX}")
     print(f"  H atom index: {H_INDEX}")
-    print(f"  C-Pt cutoff: {C_PT_CUTOFF} Å")
-    print(f"  H-Pt cutoff: {H_PT_CUTOFF} Å")
+    print(f"  Bond cutoff multiplier: {BOND_MULT} (ASE GUI-like)")
+    print(f"  C-Pt cutoff: {C_PT_CUTOFF:.3f} Å (ASE covalent radii)")
+    print(f"  H-Pt cutoff: {H_PT_CUTOFF:.3f} Å (ASE covalent radii)")
     print(f"  Pt atoms: {len(PT_INDICES)} atoms")
     
     # Get simulation parameters
@@ -513,6 +622,36 @@ def main():
     
     # Pt site analysis
     c_sites, h_sites = plot_pt_site_analysis(results, forces[:n], OUTPUT_DIR)
+
+    # Peak analysis
+    print("\n" + "=" * 60)
+    print("Histogram Peak Analysis")
+    print("=" * 60)
+
+    # Overall peaks
+    overall_peaks, overall_peak_frames = analyze_overall_peaks(forces[:n])
+    print("\nOverall Force Distribution Peaks:")
+    for i, (force, freq) in enumerate(overall_peaks, 1):
+        frames = overall_peak_frames[force]
+        frame_str = ", ".join(str(f) for f in frames)
+        print(f"  Peak {i}: Force = {force:.3f} eV/Å, Frequency = {freq:.0f}")
+        print(f"           Reference Frames: {frame_str}")
+
+    # Per-category peaks
+    frame_indices = np.arange(n)
+    category_peaks = analyze_peaks_by_category(forces[:n], labels, frame_indices)
+
+    print("\nPeaks by Coordination Category:")
+    for label in sorted(category_peaks.keys(), key=lambda x: -stats[x]['count']):
+        cat_info = category_peaks[label]
+        print(f"\n  {label}:")
+        if cat_info['note']:
+            print(f"    {cat_info['note']}")
+        else:
+            for i, (force, freq) in enumerate(cat_info['peaks'], 1):
+                frames = cat_info['peak_frames'].get(force, [])
+                frame_str = ", ".join(str(f) for f in frames) if frames else "N/A"
+                print(f"    Peak {i}: Force = {force:.3f} eV/Å, Freq = {freq:.0f}, Frames: {frame_str}")
     
     # Generate plots
     print("\nGenerating plots...")
@@ -538,8 +677,10 @@ def main():
         f.write("Configuration:\n")
         f.write(f"  C atom index: {C_INDEX}\n")
         f.write(f"  H atom index: {H_INDEX}\n")
-        f.write(f"  C-Pt cutoff: {C_PT_CUTOFF} Å\n")
-        f.write(f"  H-Pt cutoff: {H_PT_CUTOFF} Å\n")
+        f.write(f"  Bond cutoff multiplier: {BOND_MULT} (ASE GUI-like)\n")
+        f.write(f"  C-Pt cutoff: {C_PT_CUTOFF:.3f} Å (ASE covalent radii)\n")
+        f.write(f"  H-Pt cutoff: {H_PT_CUTOFF:.3f} Å (ASE covalent radii)\n")
+        f.write(f"  C-H cutoff:  {C_H_CUTOFF:.3f} Å (ASE covalent radii)\n")
         f.write(f"  Frames analyzed: {n}\n\n")
         
         f.write("Category Statistics:\n")
@@ -559,11 +700,38 @@ def main():
                    f"mean={np.mean(force_list):.3f} eV/Å\n")
         
         f.write("\nTop H bonding site combinations:\n")
-        for sites, force_list in sorted(h_sites.items(), 
+        for sites, force_list in sorted(h_sites.items(),
                                          key=lambda x: -len(x[1]))[:10]:
             f.write(f"  Pt{list(sites)}: n={len(force_list)}, "
                    f"mean={np.mean(force_list):.3f} eV/Å\n")
-    
+
+        # Write peak analysis
+        f.write("\n" + "=" * 50 + "\n")
+        f.write("Histogram Peak Analysis\n")
+        f.write("=" * 50 + "\n")
+
+        f.write("\nOverall Force Distribution Peaks:\n")
+        f.write("-" * 50 + "\n")
+        for i, (force, freq) in enumerate(overall_peaks, 1):
+            frames = overall_peak_frames[force]
+            frame_str = ", ".join(str(fr) for fr in frames)
+            f.write(f"Peak {i}: Force = {force:.4f} eV/Å, Frequency = {freq:.0f}\n")
+            f.write(f"   Reference Frames: {frame_str}\n")
+
+        f.write("\nPeaks by Coordination Category:\n")
+        f.write("-" * 50 + "\n")
+        for label in sorted(category_peaks.keys(), key=lambda x: -stats[x]['count']):
+            cat_info = category_peaks[label]
+            f.write(f"\n{label}:\n")
+            if cat_info['note']:
+                f.write(f"  {cat_info['note']}\n")
+            else:
+                for i, (force, freq) in enumerate(cat_info['peaks'], 1):
+                    frames = cat_info['peak_frames'].get(force, [])
+                    frame_str = ", ".join(str(fr) for fr in frames) if frames else "N/A"
+                    f.write(f"  Peak {i}: Force = {force:.4f} eV/Å, Frequency = {freq:.0f}\n")
+                    f.write(f"     Reference Frames: {frame_str}\n")
+
     print(f"  Saved: {report_path}")
     print("\nAnalysis complete!")
 

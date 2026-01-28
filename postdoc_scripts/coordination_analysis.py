@@ -286,23 +286,21 @@ def analyze_overall_peaks(forces):
 # =============================================================================
 
 def plot_force_histogram_by_category(forces, labels, output_dir):
-    """Plot force histogram colored by binding mode category."""
+    """Plot force histograms colored by binding mode category (two separate figures)."""
     unique_labels = sorted(set(labels))
     n_categories = len(unique_labels)
-    
+
     # Color map
     colors = plt.cm.tab10(np.linspace(0, 1, max(n_categories, 10)))
     color_map = {label: colors[i] for i, label in enumerate(unique_labels)}
-    
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    
-    # Left: Stacked histogram
-    ax1 = axes[0]
-    force_by_cat = {label: forces[np.array([l == label for l in labels])] 
+
+    force_by_cat = {label: forces[np.array([l == label for l in labels])]
                     for label in unique_labels}
-    
-    ax1.hist([force_by_cat[l] for l in unique_labels], 
-             bins=50, stacked=True, 
+
+    # Figure 1: Stacked histogram
+    fig1, ax1 = plt.subplots(figsize=(8, 6))
+    ax1.hist([force_by_cat[l] for l in unique_labels],
+             bins=50, stacked=True,
              label=unique_labels,
              color=[color_map[l] for l in unique_labels],
              edgecolor='black', linewidth=0.5)
@@ -311,9 +309,12 @@ def plot_force_histogram_by_category(forces, labels, output_dir):
     ax1.set_title('Force Distribution by Binding Mode')
     ax1.legend(loc='upper right', fontsize=8)
     ax1.grid(True, alpha=0.3)
-    
-    # Right: Overlaid normalized histograms
-    ax2 = axes[1]
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'force_histogram_stacked.png'), dpi=DPI)
+    plt.close(fig1)
+
+    # Figure 2: Overlaid normalized histograms
+    fig2, ax2 = plt.subplots(figsize=(8, 6))
     for label in unique_labels:
         f = force_by_cat[label]
         if len(f) > 10:
@@ -325,10 +326,9 @@ def plot_force_histogram_by_category(forces, labels, output_dir):
     ax2.set_title('Normalized Force Distributions')
     ax2.legend(loc='upper right', fontsize=8)
     ax2.grid(True, alpha=0.3)
-    
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'force_histogram_by_category.png'), dpi=DPI)
-    plt.close()
+    plt.savefig(os.path.join(output_dir, 'force_histogram_normalized.png'), dpi=DPI)
+    plt.close(fig2)
 
 
 def plot_coordination_time_series(results, forces, timestep_fs, output_dir):
@@ -657,7 +657,8 @@ def main():
     print("\nGenerating plots...")
     
     plot_force_histogram_by_category(forces[:n], labels, OUTPUT_DIR)
-    print(f"  Saved: {OUTPUT_DIR}/force_histogram_by_category.png")
+    print(f"  Saved: {OUTPUT_DIR}/force_histogram_stacked.png")
+    print(f"  Saved: {OUTPUT_DIR}/force_histogram_normalized.png")
     
     plot_coordination_time_series(results, forces, timestep_fs, OUTPUT_DIR)
     print(f"  Saved: {OUTPUT_DIR}/coordination_time_series.png")

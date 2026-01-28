@@ -110,22 +110,21 @@ def read_trajectory_from_segments(folders, file_type='XDATCAR'):
 def get_coordination_number(atoms, center_idx, neighbor_indices, cutoff):
     """
     Calculate coordination number for an atom.
-    
+
     Parameters:
         atoms: ASE Atoms object
         center_idx: Index of central atom
         neighbor_indices: List of potential neighbor indices (e.g., Pt atoms)
         cutoff: Distance cutoff for bonding
-    
+
     Returns:
         cn: Coordination number
         bonded_indices: List of indices within cutoff
     """
-    bonded = []
-    for pt_idx in neighbor_indices:
-        dist = atoms.get_distance(center_idx, pt_idx, mic=True)
-        if dist < cutoff:
-            bonded.append(pt_idx)
+    neighbor_indices = np.array(neighbor_indices)
+    distances = atoms.get_distances(center_idx, neighbor_indices, mic=True)
+    bonded_mask = distances < cutoff
+    bonded = neighbor_indices[bonded_mask].tolist()
     return len(bonded), bonded
 
 

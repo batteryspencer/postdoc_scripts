@@ -22,6 +22,7 @@ from glob import glob
 from collections import defaultdict
 from ase.io import read as ase_read
 from ase.data import covalent_radii, chemical_symbols
+from alive_progress import alive_bar
 
 # Import from existing script
 from constrained_force_stats import (read_simulation_data, get_file_line_count,
@@ -158,26 +159,28 @@ def analyze_trajectory_coordination(trajectory, c_idx, h_idx, pt_indices,
         'c_bonded_pt': [],
         'h_bonded_pt': [],
     }
-    
-    for atoms in trajectory:
-        # Get coordination numbers
-        c_cn, c_bonded = get_coordination_number(atoms, c_idx, pt_indices, c_cutoff)
-        h_cn, h_bonded = get_coordination_number(atoms, h_idx, pt_indices, h_cutoff)
-        
-        # Get mode labels
-        c_mode = get_binding_mode_label(c_cn)
-        h_mode = get_binding_mode_label(h_cn)
-        
-        # Combined label
-        combined = f"C-{c_mode}_H-{h_mode}"
-        
-        results['c_cn'].append(c_cn)
-        results['h_cn'].append(h_cn)
-        results['c_mode'].append(c_mode)
-        results['h_mode'].append(h_mode)
-        results['combined_label'].append(combined)
-        results['c_bonded_pt'].append(tuple(sorted(c_bonded)))
-        results['h_bonded_pt'].append(tuple(sorted(h_bonded)))
+
+    with alive_bar(len(trajectory), title='Analyzing coordination') as bar:
+        for atoms in trajectory:
+            # Get coordination numbers
+            c_cn, c_bonded = get_coordination_number(atoms, c_idx, pt_indices, c_cutoff)
+            h_cn, h_bonded = get_coordination_number(atoms, h_idx, pt_indices, h_cutoff)
+
+            # Get mode labels
+            c_mode = get_binding_mode_label(c_cn)
+            h_mode = get_binding_mode_label(h_cn)
+
+            # Combined label
+            combined = f"C-{c_mode}_H-{h_mode}"
+
+            results['c_cn'].append(c_cn)
+            results['h_cn'].append(h_cn)
+            results['c_mode'].append(c_mode)
+            results['h_mode'].append(h_mode)
+            results['combined_label'].append(combined)
+            results['c_bonded_pt'].append(tuple(sorted(c_bonded)))
+            results['h_bonded_pt'].append(tuple(sorted(h_bonded)))
+            bar()
     
     # Convert to numpy arrays where appropriate
     results['c_cn'] = np.array(results['c_cn'])

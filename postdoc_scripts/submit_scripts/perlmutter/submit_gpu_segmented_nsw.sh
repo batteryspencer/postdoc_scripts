@@ -2,8 +2,8 @@
 
 # --- SBATCH Options ---
 #SBATCH --job-name=Pt111_PMF_2PropylH_Dissociation_C-H_1.
-#SBATCH --output=job_%j.out
-#SBATCH --error=job_%j.err
+#SBATCH --output=job_logs/job_%j.out
+#SBATCH --error=job_logs/job_%j.err
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=4  # max: 128
 #SBATCH --account=m1399_g
@@ -69,7 +69,7 @@ function log_job_details {
     TOTAL_GPUS=$TOTAL_TASKS
     echo "Total GPUs for this job (equal to total tasks): $TOTAL_GPUS"
 
-    echo $SLURM_JOB_NODELIST > nodefile.$SLURM_JOB_ID
+    echo $SLURM_JOB_NODELIST > job_logs/nodefile.$SLURM_JOB_ID
 }
 
 function check_contcar_completeness {
@@ -243,7 +243,7 @@ function restart_from_checkpoint {
     fi
 
     if [ -n "$SLURM_OLD_JOB_ID" ]; then
-        if grep -q "ZBRENT: fatal error: bracketing interval incorrect" job_${SLURM_OLD_JOB_ID}.out; then
+        if grep -q "ZBRENT: fatal error: bracketing interval incorrect" job_logs/job_${SLURM_OLD_JOB_ID}.out; then
             echo -e "\nCopying CONTCAR to POSCAR"
             cp CONTCAR POSCAR
         fi

@@ -2,8 +2,8 @@
 
 # --- SBATCH Options ---
 #SBATCH --job-name=Pt111_PMF_2PropylH_Dissociation_C-H_2.49
-#SBATCH --output=job_%j.out
-#SBATCH --error=job_%j.err
+#SBATCH --output=job_logs/job_%j.out
+#SBATCH --error=job_logs/job_%j.err
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=64  # max: 128
 #SBATCH --account=m1399
@@ -65,7 +65,7 @@ function log_job_details {
     CPUS_PER_TASK=$(($SLURM_CPUS_ON_NODE / $SLURM_NTASKS_PER_NODE))
     echo "CPUs per task (total CPUs on node / tasks per node): $SLURM_CPUS_ON_NODE / $SLURM_NTASKS_PER_NODE = $CPUS_PER_TASK"
 
-    echo $SLURM_JOB_NODELIST > nodefile.$SLURM_JOB_ID
+    echo $SLURM_JOB_NODELIST > job_logs/nodefile.$SLURM_JOB_ID
 }
 
 # Log bad nodes to a central file for tracking
@@ -74,7 +74,7 @@ function log_bad_nodes {
     local steps_completed="$2"
     local elapsed_minutes="$3"
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    local nodes=$(cat $SLURM_SUBMIT_DIR/nodefile.$SLURM_JOB_ID 2>/dev/null || echo "unknown")
+    local nodes=$(cat $SLURM_SUBMIT_DIR/job_logs/nodefile.$SLURM_JOB_ID 2>/dev/null || echo "unknown")
 
     # Ensure bad node log directory exists
     mkdir -p "$(dirname "$BAD_NODE_LOG")"
@@ -354,7 +354,7 @@ function restart_from_checkpoint {
     fi
 
     if [ -n "$SLURM_OLD_JOB_ID" ]; then
-        if grep -q "ZBRENT: fatal error: bracketing interval incorrect" job_${SLURM_OLD_JOB_ID}.out; then
+        if grep -q "ZBRENT: fatal error: bracketing interval incorrect" job_logs/job_${SLURM_OLD_JOB_ID}.out; then
             echo -e "\nCopying CONTCAR to POSCAR"
             cp CONTCAR POSCAR
         fi

@@ -265,7 +265,7 @@ function setup_simulation_directory {
         fi
 
         # Set NSW to SEGMENT_SIZE
-        sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
+        tmp_file=$(mktemp) && sed 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR > "$tmp_file" && mv "$tmp_file" INCAR
 
         return
     fi
@@ -281,7 +281,7 @@ function setup_simulation_directory {
     fi
 
     # For all other segments, set NSW to SEGMENT_SIZE
-    sed -i 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR
+    tmp_file=$(mktemp) && sed 's/^\(\s*NSW\s*=\s*\).*$/\1'"$SEGMENT_SIZE"'/' INCAR > "$tmp_file" && mv "$tmp_file" INCAR
 
     # Change to the segment directory
     cd "seg"$seg
